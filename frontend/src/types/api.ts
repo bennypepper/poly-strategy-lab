@@ -83,3 +83,37 @@ export interface MarketDataResponse {
   count: number;
   data: MarketDataPoint[];
 }
+
+export interface OptimizeRequest {
+  symbol: string;
+  buy_thresholds?: number[];
+  sell_thresholds?: number[];
+  alloc_pcts?: number[];
+  initial_capital?: number;
+  fee_rate?: number;
+}
+
+export interface OptimizeTrial {
+  threshold_buy: number;
+  threshold_sell: number;
+  alloc_buy_pct: number;
+  total_return_pct: number;
+  max_drawdown_pct: number;
+  sharpe_ratio: number;
+  win_rate_pct: number;
+  trade_count: number;
+}
+
+export interface OptimizeResponse {
+  success: boolean;
+  symbol: string;
+  total_trials: number;
+  target_alloc_for_heatmap: number;
+  buy_thresholds: number[];
+  sell_thresholds: number[];
+  heatmap_matrix: (number | null)[][];
+  best_by_return: OptimizeTrial;
+  best_by_sharpe: OptimizeTrial;
+  best_by_drawdown: OptimizeTrial;
+  top_trials: OptimizeTrial[];
+}

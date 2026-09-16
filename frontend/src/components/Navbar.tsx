@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, Layers, BarChart2, BookOpen, ExternalLink } from "lucide-react";
+import { Activity, Layers, BarChart2, BookOpen, ExternalLink, Sliders } from "lucide-react";
 
 export function Navbar() {
   const pathname = usePathname();
@@ -10,6 +10,7 @@ export function Navbar() {
   const navItems = [
     { label: "Overview", href: "/", icon: Layers },
     { label: "Simulator", href: "/simulator", icon: Activity },
+    { label: "Optimizer", href: "/optimizer", icon: Sliders },
     { label: "Research Archive", href: "/research", icon: BarChart2 },
     { label: "Documentation", href: "/docs", icon: BookOpen },
   ];

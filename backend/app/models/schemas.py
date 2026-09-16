@@ -86,3 +86,24 @@ class MarketDataResponse(BaseModel):
     symbol: str
     count: int
     data: List[MarketDataPoint]
+
+class OptimizeRequest(BaseModel):
+    symbol: str = Field(default="BTC-USD")
+    buy_thresholds: List[int] = Field(default=[15, 20, 25, 30, 35, 40])
+    sell_thresholds: List[int] = Field(default=[60, 65, 70, 75, 80, 85])
+    alloc_pcts: List[float] = Field(default=[0.4, 0.6, 0.8, 1.0])
+    initial_capital: float = Field(default=100_000.0)
+    fee_rate: float = Field(default=0.001)
+
+class OptimizeResponse(BaseModel):
+    success: bool
+    symbol: str
+    total_trials: int
+    target_alloc_for_heatmap: float
+    buy_thresholds: List[int]
+    sell_thresholds: List[int]
+    heatmap_matrix: List[List[Optional[float]]]
+    best_by_return: dict
+    best_by_sharpe: dict
+    best_by_drawdown: dict
+    top_trials: List[dict]
