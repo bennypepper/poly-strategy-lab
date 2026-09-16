@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Activity, ArrowUpRight, ArrowDownRight, RefreshCw, BarChart2, DollarSign, Percent, Zap } from "lucide-react";
-import { runBacktest } from "@/lib/api-client";
-import { BacktestResponse, AssetInfo } from "@/types/api";
+import { Activity, RefreshCw, Zap, Search, Plus } from "lucide-react";
+import { runBacktest, fetchMarketData } from "@/lib/api-client";
+import { BacktestResponse, MarketDataPoint } from "@/types/api";
+import { TradingViewCandlestick } from "@/components/charts/TradingViewCandlestick";
+import { TradingViewEquity } from "@/components/charts/TradingViewEquity";
 
-const ASSETS = [
+const PRESET_ASSETS = [
   { symbol: "BTC-USD", name: "Bitcoin", icon: "₿" },
   { symbol: "ETH-USD", name: "Ethereum", icon: "Ξ" },
   { symbol: "SOL-USD", name: "Solana", icon: "◎" },
@@ -14,6 +16,9 @@ const ASSETS = [
 
 export default function SimulatorPage() {
   const [symbol, setSymbol] = useState("BTC-USD");
+  const [customTickerInput, setCustomTickerInput] = useState("");
+  const [showCustomInput, setShowCustomInput] = useState(false);
+
   const [buyThreshold, setBuyThreshold] = useState(35);
   const [sellThreshold, setSellThreshold] = useState(70);
   const [allocBuyPct, setAllocBuyPct] = useState(0.8);
@@ -22,8 +27,9 @@ export default function SimulatorPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<BacktestResponse | null>(null);
+  const [candles, setCandles] = useState<MarketDataPoint[]>([]);
 
-  const handleRunSimulation = async () => {
+  const handleRunSimulation = async (targetSymbol = symbol) => {
     if (buyThreshold >= sellThreshold) {
       setError("Buy threshold must be strictly lower than sell threshold.");
       return;
@@ -32,14 +38,19 @@ export default function SimulatorPage() {
     setLoading(true);
 
     try {
-      const data = await runBacktest({
-        symbol,
-        threshold_buy: buyThreshold,
-        threshold_sell: sellThreshold,
-        alloc_buy_pct: allocBuyPct,
-        initial_capital: initialCapital,
-      });
-      setResult(data);
+      const [backtestRes, marketRes] = await Promise.all([
+        runBacktest({
+          symbol: targetSymbol,
+          threshold_buy: buyThreshold,
+          threshold_sell: sellThreshold,
+          alloc_buy_pct: allocBuyPct,
+          initial_capital: initialCapital,
+        }),
+        fetchMarketData(targetSymbol).catch(() => ({ data: [] })),
+      ]);
+
+      setResult(backtestRes);
+      setCandles(marketRes.data || []);
     } catch (err: any) {
       setError(err.message || "Failed to execute backtest");
     } finally {
@@ -47,8 +58,16 @@ export default function SimulatorPage() {
     }
   };
 
+  const handleCustomTickerSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customTickerInput.trim()) return;
+    const formatted = customTickerInput.trim().toUpperCase();
+    setSymbol(formatted);
+    setShowCustomInput(false);
+  };
+
   useEffect(() => {
-    handleRunSimulation();
+    handleRunSimulation(symbol);
   }, [symbol]);
 
   return (
@@ -58,18 +77,21 @@ export default function SimulatorPage() {
           Multi-Asset Strategy Simulator
         </h1>
         <p className="mt-1 text-sm text-zinc-400">
-          Execute quantitative backtests across Bitcoin, Ethereum, and Solana with dynamic channel normalization.
+          Execute quantitative backtests across Bitcoin, Ethereum, Solana, and custom tickers with dynamic channel normalization.
         </p>
       </div>
 
-      {/* Asset Switcher Pills */}
-      <div className="flex flex-wrap gap-2 mb-8">
-        {ASSETS.map((asset) => (
+      {/* Asset Switcher with Custom Ticker Input */}
+      <div className="flex flex-wrap items-center gap-2 mb-8">
+        {PRESET_ASSETS.map((asset) => (
           <button
             key={asset.symbol}
-            onClick={() => setSymbol(asset.symbol)}
+            onClick={() => {
+              setSymbol(asset.symbol);
+              setShowCustomInput(false);
+            }}
             className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all ${
-              symbol === asset.symbol
+              symbol === asset.symbol && !showCustomInput
                 ? "bg-emerald-500 text-zinc-950 shadow-md shadow-emerald-500/20 font-semibold"
                 : "bg-zinc-900 border border-zinc-800 text-zinc-300 hover:border-zinc-700 hover:text-white"
             }`}
@@ -79,6 +101,47 @@ export default function SimulatorPage() {
             <span className="text-xs opacity-70">({asset.symbol})</span>
           </button>
         ))}
+
+        {/* Custom Ticker Button & Form */}
+        {!showCustomInput ? (
+          <button
+            onClick={() => setShowCustomInput(true)}
+            className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium border transition-all ${
+              !PRESET_ASSETS.some((a) => a.symbol === symbol)
+                ? "bg-emerald-500 text-zinc-950 border-emerald-500 font-semibold"
+                : "bg-zinc-900/60 border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700"
+            }`}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            <span>{!PRESET_ASSETS.some((a) => a.symbol === symbol) ? symbol : "Custom Asset"}</span>
+          </button>
+        ) : (
+          <form onSubmit={handleCustomTickerSubmit} className="flex items-center gap-2">
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="e.g. AVAX-USD, SPY"
+                value={customTickerInput}
+                onChange={(e) => setCustomTickerInput(e.target.value)}
+                autoFocus
+                className="rounded-lg border border-emerald-500/50 bg-zinc-900 px-3 py-1.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-400 w-44 uppercase"
+              />
+            </div>
+            <button
+              type="submit"
+              className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-zinc-950 hover:bg-emerald-400 transition-colors"
+            >
+              Load
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowCustomInput(false)}
+              className="rounded-lg border border-zinc-700 px-2 py-1.5 text-xs text-zinc-400 hover:text-white"
+            >
+              Cancel
+            </button>
+          </form>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-4">
@@ -156,7 +219,7 @@ export default function SimulatorPage() {
             )}
 
             <button
-              onClick={handleRunSimulation}
+              onClick={() => handleRunSimulation(symbol)}
               disabled={loading}
               className="w-full flex items-center justify-center gap-2 rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-emerald-400 transition-colors disabled:opacity-50"
             >
@@ -230,66 +293,27 @@ export default function SimulatorPage() {
                 </div>
               </div>
 
-              {/* Equity Curve Visualizer */}
-              <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-semibold text-white">Cumulative Equity Curve</h3>
-                  <div className="flex items-center gap-4 text-xs">
-                    <div className="flex items-center gap-1.5">
-                      <span className="h-2.5 w-2.5 rounded-full bg-emerald-400"></span>
-                      <span className="text-zinc-300">Strategy (${result.metrics.final_equity.toLocaleString()})</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="h-2.5 w-2.5 rounded-full bg-zinc-500"></span>
-                      <span className="text-zinc-400">Buy & Hold</span>
-                    </div>
-                  </div>
-                </div>
+              {/* TradingView Lightweight Candlestick Chart */}
+              {candles.length > 0 && (
+                <TradingViewCandlestick
+                  data={candles}
+                  symbol={symbol}
+                  height={380}
+                  buyThreshold={buyThreshold}
+                  sellThreshold={sellThreshold}
+                />
+              )}
 
-                {/* SVG Cumulative Chart */}
-                <div className="h-64 w-full relative flex items-end">
-                  <svg className="w-full h-full overflow-visible" preserveAspectRatio="none" viewBox="0 0 1000 300">
-                    {(() => {
-                      const pts = result.equity_curve;
-                      if (!pts || pts.length < 2) return null;
-                      const maxVal = Math.max(...pts.map((p) => Math.max(p.equity, p.benchmark_equity)));
-                      const minVal = Math.min(...pts.map((p) => Math.min(p.equity, p.benchmark_equity)));
-                      const range = maxVal - minVal || 1;
-
-                      const stratPoints = pts
-                        .map((p, idx) => {
-                          const x = (idx / (pts.length - 1)) * 1000;
-                          const y = 280 - ((p.equity - minVal) / range) * 260;
-                          return `${x},${y}`;
-                        })
-                        .join(" ");
-
-                      const benchPoints = pts
-                        .map((p, idx) => {
-                          const x = (idx / (pts.length - 1)) * 1000;
-                          const y = 280 - ((p.benchmark_equity - minVal) / range) * 260;
-                          return `${x},${y}`;
-                        })
-                        .join(" ");
-
-                      return (
-                        <>
-                          <polyline fill="none" stroke="#71717a" strokeWidth="1.5" strokeDasharray="4" points={benchPoints} />
-                          <polyline fill="none" stroke="#10b981" strokeWidth="2.5" points={stratPoints} />
-                        </>
-                      );
-                    })()}
-                  </svg>
-                </div>
-                <div className="flex justify-between text-xs text-zinc-500 mt-2">
-                  <span>{result.equity_curve[0]?.date}</span>
-                  <span>{result.equity_curve[result.equity_curve.length - 1]?.date}</span>
-                </div>
-              </div>
+              {/* TradingView Equity Curve */}
+              {result.equity_curve.length > 0 && (
+                <TradingViewEquity data={result.equity_curve} height={280} />
+              )}
 
               {/* Trade Execution Log */}
               <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-6">
-                <h3 className="font-semibold text-white mb-4">Trade Execution Log ({result.trades.length} Executions)</h3>
+                <h3 className="font-semibold text-white mb-4">
+                  Trade Execution Log ({result.trades.length} Executions)
+                </h3>
                 <div className="overflow-x-auto max-h-64">
                   <table className="w-full text-left text-xs">
                     <thead className="border-b border-zinc-800 text-zinc-400 sticky top-0 bg-zinc-900">
