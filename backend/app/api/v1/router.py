@@ -1,0 +1,9 @@
+from fastapi import APIRouter
+from app.api.v1.assets import router as assets_router
+from app.api.v1.market_data import router as market_data_router
+from app.api.v1.backtest import router as backtest_router
+
+api_v1_router = APIRouter()
+api_v1_router.include_router(assets_router)
+api_v1_router.include_router(market_data_router)
+api_v1_router.include_router(backtest_router)
