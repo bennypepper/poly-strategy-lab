@@ -1,11 +1,24 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Activity, RefreshCw, Zap, Search, Plus } from "lucide-react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import {
+  Activity,
+  RefreshCw,
+  Zap,
+  Search,
+  Plus,
+  Share2,
+  Download,
+  FileSpreadsheet,
+  FileCode,
+  Check,
+} from "lucide-react";
 import { runBacktest, fetchMarketData } from "@/lib/api-client";
 import { BacktestResponse, MarketDataPoint } from "@/types/api";
 import { TradingViewCandlestick } from "@/components/charts/TradingViewCandlestick";
 import { TradingViewEquity } from "@/components/charts/TradingViewEquity";
+import { exportTradesToCsv, exportEquityToCsv, exportFullReportJson } from "@/lib/export-utils";
 
 const PRESET_ASSETS = [
   { symbol: "BTC-USD", name: "Bitcoin", icon: "₿" },
@@ -14,20 +27,48 @@ const PRESET_ASSETS = [
   { symbol: "BNB-USD", name: "BNB", icon: "⬡" },
 ];
 
-export default function SimulatorPage() {
-  const [symbol, setSymbol] = useState("BTC-USD");
+function SimulatorContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  const initialSymbol = searchParams.get("symbol") || "BTC-USD";
+  const initialBuy = searchParams.get("buy") ? Number(searchParams.get("buy")) : 35;
+  const initialSell = searchParams.get("sell") ? Number(searchParams.get("sell")) : 70;
+  const initialAlloc = searchParams.get("alloc") ? Number(searchParams.get("alloc")) : 0.8;
+  const initialCapitalParam = searchParams.get("capital") ? Number(searchParams.get("capital")) : 10000;
+
+  const [symbol, setSymbol] = useState(initialSymbol);
   const [customTickerInput, setCustomTickerInput] = useState("");
   const [showCustomInput, setShowCustomInput] = useState(false);
 
-  const [buyThreshold, setBuyThreshold] = useState(35);
-  const [sellThreshold, setSellThreshold] = useState(70);
-  const [allocBuyPct, setAllocBuyPct] = useState(0.8);
-  const [initialCapital, setInitialCapital] = useState(10000);
+  const [buyThreshold, setBuyThreshold] = useState(initialBuy);
+  const [sellThreshold, setSellThreshold] = useState(initialSell);
+  const [allocBuyPct, setAllocBuyPct] = useState(initialAlloc);
+  const [initialCapital, setInitialCapital] = useState(initialCapitalParam);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<BacktestResponse | null>(null);
   const [candles, setCandles] = useState<MarketDataPoint[]>([]);
+  const [copiedLink, setCopiedLink] = useState(false);
+
+  // Sync state to URL parameters
+  const updateUrlParams = (
+    sym: string,
+    buy: number,
+    sell: number,
+    alloc: number,
+    capital: number
+  ) => {
+    const params = new URLSearchParams();
+    params.set("symbol", sym);
+    params.set("buy", buy.toString());
+    params.set("sell", sell.toString());
+    params.set("alloc", alloc.toString());
+    params.set("capital", capital.toString());
+    const newUrl = `${window.location.pathname}?${params.toString()}`;
+    window.history.replaceState(null, "", newUrl);
+  };
 
   const handleRunSimulation = async (targetSymbol = symbol) => {
     if (buyThreshold >= sellThreshold) {
@@ -36,6 +77,8 @@ export default function SimulatorPage() {
     }
     setError(null);
     setLoading(true);
+
+    updateUrlParams(targetSymbol, buyThreshold, sellThreshold, allocBuyPct, initialCapital);
 
     try {
       const [backtestRes, marketRes] = await Promise.all([
@@ -58,6 +101,14 @@ export default function SimulatorPage() {
     }
   };
 
+  const handleShareLink = () => {
+    if (typeof window !== "undefined") {
+      navigator.clipboard.writeText(window.location.href);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
+    }
+  };
+
   const handleCustomTickerSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!customTickerInput.trim()) return;
@@ -72,13 +123,33 @@ export default function SimulatorPage() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
-          Multi-Asset Strategy Simulator
-        </h1>
-        <p className="mt-1 text-sm text-zinc-400">
-          Execute quantitative backtests across Bitcoin, Ethereum, Solana, and custom tickers with dynamic channel normalization.
-        </p>
+      {/* Header with Share Button */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
+            Multi-Asset Strategy Simulator
+          </h1>
+          <p className="mt-1 text-sm text-zinc-400">
+            Execute quantitative backtests across Bitcoin, Ethereum, Solana, and custom tickers with dynamic channel normalization.
+          </p>
+        </div>
+
+        <button
+          onClick={handleShareLink}
+          className="inline-flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-3.5 py-2 text-xs font-semibold text-zinc-200 hover:bg-zinc-800 hover:text-white transition-colors self-start sm:self-auto"
+        >
+          {copiedLink ? (
+            <>
+              <Check className="h-3.5 w-3.5 text-emerald-400" />
+              <span className="text-emerald-400">Copied to Clipboard!</span>
+            </>
+          ) : (
+            <>
+              <Share2 className="h-3.5 w-3.5 text-zinc-400" />
+              <span>Share Strategy</span>
+            </>
+          )}
+        </button>
       </div>
 
       {/* Asset Switcher with Custom Ticker Input */}
@@ -102,7 +173,6 @@ export default function SimulatorPage() {
           </button>
         ))}
 
-        {/* Custom Ticker Button & Form */}
         {!showCustomInput ? (
           <button
             onClick={() => setShowCustomInput(true)}
@@ -309,11 +379,45 @@ export default function SimulatorPage() {
                 <TradingViewEquity data={result.equity_curve} height={280} />
               )}
 
-              {/* Trade Execution Log */}
+              {/* Trade Execution Log with Export Suite */}
               <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-6">
-                <h3 className="font-semibold text-white mb-4">
-                  Trade Execution Log ({result.trades.length} Executions)
-                </h3>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
+                  <div>
+                    <h3 className="font-semibold text-white">
+                      Trade Execution Log ({result.trades.length} Executions)
+                    </h3>
+                    <p className="text-xs text-zinc-500">Detailed transaction ledger and portfolio cash adjustments.</p>
+                  </div>
+
+                  {/* Export Suite Buttons */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      onClick={() => exportTradesToCsv(symbol, result.trades)}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-xs font-medium text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                      title="Download trades as CSV"
+                    >
+                      <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-400" />
+                      <span>Trades CSV</span>
+                    </button>
+                    <button
+                      onClick={() => exportEquityToCsv(symbol, result.equity_curve)}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-xs font-medium text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                      title="Download daily equity curve as CSV"
+                    >
+                      <Download className="h-3.5 w-3.5 text-cyan-400" />
+                      <span>Equity CSV</span>
+                    </button>
+                    <button
+                      onClick={() => exportFullReportJson(symbol, result)}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-xs font-medium text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                      title="Download complete simulation JSON"
+                    >
+                      <FileCode className="h-3.5 w-3.5 text-purple-400" />
+                      <span>JSON Report</span>
+                    </button>
+                  </div>
+                </div>
+
                 <div className="overflow-x-auto max-h-64">
                   <table className="w-full text-left text-xs">
                     <thead className="border-b border-zinc-800 text-zinc-400 sticky top-0 bg-zinc-900">
@@ -356,5 +460,19 @@ export default function SimulatorPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function SimulatorPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <RefreshCw className="h-8 w-8 text-emerald-400 animate-spin" />
+        </div>
+      }
+    >
+      <SimulatorContent />
+    </Suspense>
   );
 }
