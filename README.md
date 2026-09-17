@@ -2,13 +2,42 @@
 
 Interactive multi-asset quantitative trading strategy laboratory and parameter optimization platform.
 
-Poly Strategy Lab is the production-grade, multi-asset evolution (v2) of the academic research simulator [btc-strategy-lab](https://github.com/bennypepper/btc-strategy-lab) (PKL Research, 2026). It extends quantitative signal analysis and parameter optimization across Bitcoin (BTC), Ethereum (ETH), Solana (SOL), and customizable asset universes.
+Poly Strategy Lab is a production-grade, multi-asset quantitative platform extending algorithmic backtesting, dynamic channel normalization, and parameter grid search across cryptocurrencies, equities, and customizable asset universes.
+
+---
+
+## Key Features
+
+1. **Bifurcated Quantitative Architecture**:
+   - **Equities & Stock Index ETFs (QQQ, SPY, Growth Equities)**:
+     - Causal rolling log-linear regression channel tracking geometric compounding growth.
+     - Gaussian valuation oscillator ($\Phi(Z_t)$) with rolling volatility normalization.
+     - Secular Trend Regime Gating (50-EMA vs. 200-EMA) that rotates exposure to cash during multi-year secular bear regimes (slashing QQQ maximum drawdown from -80.45% to -29.82% over 1999-2026).
+   - **Cryptocurrencies (BTC, ETH, SOL, Altcoins)**:
+     - Bitcoin: Scale-invariant logarithmic regression and halving-cycle rainbow bands.
+     - Altcoins: Dynamic Adaptive Residual Channel (DARC) with beta-adjusted momentum and continuous normalization.
+
+2. **Multi-Asset Strategy Simulator**:
+   - Support for Top 10 Cryptocurrencies by market cap (BTC, ETH, SOL, BNB, XRP, ADA, DOGE, AVAX, LINK, NEAR) plus custom tickers (e.g. SPY, QQQ, AAPL).
+   - High-performance TradingView Lightweight Charts (candlestick chart with dynamic channel bands and equity curve).
+   - Logarithmic and linear scale switching for multi-decade exponential curves.
+   - Benchmark comparison against Buy & Hold.
+   - Instant parameter adjustments with URL sharing and deep-linking.
+   - Trade history export in CSV and full JSON simulation reports.
+
+3. **Multi-Objective Parameter Optimizer**:
+   - Numba JIT-compiled C-speed backtesting engine evaluating 144 parameter combinations in seconds.
+   - 2D sensitivity heatmap identifying robust parameter neighborhoods.
+   - Optimal parameter profiles ranked by Sharpe Ratio, Total Return, and Minimum Drawdown.
+   - One-click transfer to Strategy Simulator from any configuration card or table row.
+
+4. **Persistent Watchlist**:
+   - Client-side reactive asset store backed by `localStorage`.
+   - Unified watchlist synchronized seamlessly between Simulator and Optimizer.
 
 ---
 
 ## Architecture Overview
-
-Poly Strategy Lab is architected as a decoupled, high-performance web platform:
 
 ```text
 poly-strategy-lab/
@@ -17,69 +46,83 @@ poly-strategy-lab/
 │   │   ├── api/v1/           # REST endpoints (assets, market data, backtest, optimize)
 │   │   ├── core/             # Configuration, logging, CORS
 │   │   ├── engine/           # Vectorized & Numba JIT-accelerated backtest kernels
-│   │   ├── indicators/       # Dynamic logarithmic channel normalizer & momentum indicators
+│   │   ├── indicators/       # Bifurcated dynamic channels (equity compounding & crypto power-law)
 │   │   ├── models/           # Pydantic v2 schemas and domain models
-│   │   └── services/         # Multi-asset data fetching (Yahoo Finance / CCXT) and caching
-│   └── tests/                # Automated pytest suite (parity, edge-cases, multi-asset)
-├── frontend/                 # Modern Next.js 15 App Router web application
+│   │   └── services/         # Multi-asset data fetching and parquet caching
+│   └── tests/                # Automated pytest suite (unit, boundary, edge-cases)
+├── frontend/                 # Modern Next.js 14/15 App Router web application
 │   ├── src/
 │   │   ├── app/              # Routes: /simulator, /optimizer, /research, /docs
-│   │   ├── components/       # TradingView Lightweight Charts, parameter controls, metrics
-│   │   ├── hooks/            # Reactive data fetching and backtest execution hooks
-│   │   └── lib/              # Typed API clients and formatters
-└── docker-compose.yml        # Unified container orchestration
+│   │   ├── components/       # TradingView Lightweight Charts, parameter controls, badges
+│   │   ├── hooks/            # Reactive data fetching hooks
+│   │   ├── lib/              # Typed API clients, asset store, export utilities
+│   │   └── types/            # TypeScript domain interfaces
+│   └── public/               # Static assets
+└── docs/
+    └── research/             # Comprehensive quantitative research whitepapers
+        ├── CRYPTO_METHODOLOGY.md       # Crypto power-law & altcoin DARC research
+        └── EQUITY_ETF_METHODOLOGY.md   # Equity compounding channel & regime gating research
 ```
 
 ---
 
-## Core Capabilities
+## Quantitative Research Documentation
 
-1. **Multi-Asset Strategy Backtesting:**
-   - Execute vectorized backtests across arbitrary cryptocurrencies and market indices.
-   - Zero return dilution on day 0 evaluation: metrics reflect true inter-day volatility.
-   - Dual-scenario and custom threshold execution with dust guards and realistic transaction costs.
-
-2. **Generalized Dynamic Channel Normalization:**
-   - Logarithmic regression bands calibrated per asset to eliminate retroactivity and Index Revision Bias.
-   - Configurable channel parameters adapting to asset maturity and historical cycle length.
-
-3. **TradingView Lightweight Charts Integration:**
-   - High-performance 60fps canvas-rendered candlestick charts with dynamic indicator overlays.
-   - Interactive equity curves comparing strategy performance against benchmark Buy & Hold.
-
-4. **Multi-Objective Grid Search Optimization:**
-   - Rapid parameter grid search across Total Return, Maximum Drawdown, and Sharpe Ratio.
-   - 2D sensitivity heatmaps for identifying robust parameter regions and avoiding overfitting.
+Detailed theoretical frameworks, mathematical proofs, and empirical analyses are documented in:
+- [Crypto Methodology Whitepaper](docs/research/CRYPTO_METHODOLOGY.md): Scale-invariant power laws, Metcalfe network adoption, and Altcoin Dynamic Adaptive Residual Channel.
+- [Equity & Index ETF Methodology Whitepaper](docs/research/EQUITY_ETF_METHODOLOGY.md): Compound growth dynamics, Moskowitz time-series momentum, and secular trend regime filtering.
 
 ---
 
-## Research Lineage
+## Lineage
 
-- **Version 1 (Academic Research Demo):** [btc-strategy-lab](https://github.com/bennypepper/btc-strategy-lab) (Live: [btc-strategy-lab.streamlit.app](https://btc-strategy-lab.streamlit.app))
+- **Version 1 (Bitcoin Strategy Lab):** [btc-strategy-lab](https://github.com/bennypepper/btc-strategy-lab)
 - **Phase 1-3 Research Pipeline:** [btc-trading-optimization](https://github.com/bennypepper/btc-trading-optimization)
-- **Thesis Title:** *Optimalisasi Parameter Trading Bitcoin Menggunakan Grid Search pada Tiga Metrik Evaluasi Berbasis Indikator Logarithmic Regression* (PKL Research, 2026)
 
 ---
 
 ## Quick Start (Local Development)
 
 ### 1. Backend Setup (FastAPI)
+
+Prerequisites: Python 3.11+
+
 ```bash
 cd backend
 python -m venv .venv
-source .venv/bin/activate  # Or on Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
-```
-Interactive Swagger API documentation will be available at `http://localhost:8000/docs`.
+# Windows:
+.venv\Scripts\activate
+# Linux/macOS:
+source .venv/bin/activate
 
-### 2. Frontend Setup (Next.js 15)
+pip install -r requirements.txt
+uvicorn app.main:app --port 8000 --reload
+```
+
+Interactive API documentation will be available at `http://localhost:8000/docs`.
+
+To run backend tests:
+```bash
+pytest
+```
+
+### 2. Frontend Setup (Next.js)
+
+Prerequisites: Node.js 18+
+
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
+
 Open `http://localhost:3000` in your browser.
+
+To build and run in production mode:
+```bash
+npm run build
+npm run start
+```
 
 ---
 
