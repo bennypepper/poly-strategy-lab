@@ -64,7 +64,7 @@ export function Navbar() {
             rel="noopener noreferrer"
             className="hidden sm:inline-flex items-center gap-1.5 rounded-md border border-zinc-700 bg-zinc-900/60 px-3 py-1.5 text-xs font-medium text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
           >
-            <span>v1 Streamlit Demo</span>
+            <span>v1 BTC Strategy Lab</span>
             <ExternalLink className="h-3 w-3 text-zinc-400" />
           </a>
 

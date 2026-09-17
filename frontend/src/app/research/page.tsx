@@ -15,16 +15,13 @@ export default function ResearchPage() {
       <div className="max-w-3xl mb-8">
         <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-400 mb-3">
           <Award className="h-3.5 w-3.5" />
-          Academic Foundation
+          Quantitative Methodology
         </div>
         <h1 className="text-3xl font-bold tracking-tight text-white">
-          PKL 2026 Undergraduate Research Archive
+          Quantitative Research Archive
         </h1>
         <p className="mt-2 text-sm text-zinc-400 leading-relaxed">
-          Poly Strategy Lab is grounded in the undergraduate research thesis:{" "}
-          <span className="italic text-zinc-300">
-            &quot;Optimalisasi Parameter Trading Bitcoin Menggunakan Grid Search pada Tiga Metrik Evaluasi Berbasis Indikator Logarithmic Regression&quot;
-          </span>.
+          Empirical indicator evaluation, statistical correlation metrics, and quantitative foundations underpinning the Poly Strategy Lab backtesting engine.
         </p>
       </div>
 
@@ -32,9 +29,9 @@ export default function ResearchPage() {
         {/* Main Content */}
         <div className="md:col-span-2 space-y-8">
           <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-6">
-            <h2 className="text-lg font-semibold text-white mb-4">Phase 2: Indicator Selection Ranking</h2>
+            <h2 className="text-lg font-semibold text-white mb-4">Indicator Evaluation & Selection</h2>
             <p className="text-xs text-zinc-400 mb-4">
-              Across 10 on-chain and price-based indicators evaluated with Spearman correlation over 5 lag windows (14, 30, 60, 90, 180 days), Logarithmic Regression achieved the highest composite statistical significance.
+              Across 10 on-chain and technical market indicators evaluated with Spearman correlation over 5 lag windows (14, 30, 60, 90, 180 days), Logarithmic Regression achieved the highest composite predictive consistency.
             </p>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
@@ -95,8 +92,8 @@ export default function ResearchPage() {
                 className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900 p-3 text-xs text-zinc-200 hover:border-zinc-700 hover:text-white transition-colors"
               >
                 <div>
-                  <div className="font-medium">v1 Streamlit Demo</div>
-                  <div className="text-zinc-500">Official research deliverable</div>
+                  <div className="font-medium">BTC Strategy Lab (v1 Demo)</div>
+                  <div className="text-zinc-500">Initial Bitcoin strategy prototype</div>
                 </div>
                 <ExternalLink className="h-4 w-4 text-zinc-400" />
               </a>
@@ -108,8 +105,8 @@ export default function ResearchPage() {
                 className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900 p-3 text-xs text-zinc-200 hover:border-zinc-700 hover:text-white transition-colors"
               >
                 <div>
-                  <div className="font-medium">btc-strategy-lab (v1)</div>
-                  <div className="text-zinc-500">Public research repository</div>
+                  <div className="font-medium">btc-strategy-lab</div>
+                  <div className="text-zinc-500">Foundational Bitcoin strategy repo</div>
                 </div>
                 <ExternalLink className="h-4 w-4 text-zinc-400" />
               </a>
@@ -122,7 +119,7 @@ export default function ResearchPage() {
               >
                 <div>
                   <div className="font-medium">btc-trading-optimization</div>
-                  <div className="text-zinc-500">Phase 1-3 pipeline code</div>
+                  <div className="text-zinc-500">Indicator evaluation pipeline</div>
                 </div>
                 <ExternalLink className="h-4 w-4 text-zinc-400" />
               </a>

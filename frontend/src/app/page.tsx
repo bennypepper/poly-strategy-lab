@@ -43,7 +43,7 @@ export default function Home() {
           </h1>
 
           <p className="mt-6 text-lg text-zinc-400 leading-relaxed">
-            The next-generation successor to the PKL 2026 academic research project. Run high-speed strategy simulations, calibrate dynamic logarithmic channels, and optimize trading parameters across crypto assets.
+            The next-generation multi-asset successor to BTC Strategy Lab. Run high-speed strategy simulations, calibrate dynamic logarithmic channels, and optimize trading parameters across crypto assets.
           </p>
 
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -60,7 +60,7 @@ export default function Home() {
               className="inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900/60 px-6 py-3 text-sm font-semibold text-zinc-200 hover:bg-zinc-800 hover:text-white transition-colors"
             >
               <BarChart3 className="h-4 w-4" />
-              Explore Research Thesis
+              Explore Research Archive
             </Link>
           </div>
         </div>
@@ -90,9 +90,9 @@ export default function Home() {
       {/* Version Comparison Section */}
       <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8 border-t border-zinc-800/60">
         <div className="max-w-3xl mx-auto text-center mb-12">
-          <h2 className="text-2xl font-bold text-white sm:text-3xl">Architectural Comparison</h2>
+          <h2 className="text-2xl font-bold text-white sm:text-3xl">Architectural Evolution</h2>
           <p className="mt-3 text-zinc-400 text-sm">
-            Maintaining academic integrity with v1 while evolving into a production-grade platform.
+            Maintaining continuity with the foundational BTC Strategy Lab prototype while expanding into a production-grade multi-asset platform.
           </p>
         </div>
 
@@ -100,8 +100,8 @@ export default function Home() {
           {/* v1 Card */}
           <div className="rounded-xl border border-zinc-800 bg-zinc-900/20 p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-zinc-300">v1 Academic Demo (Streamlit)</h3>
-              <span className="text-xs text-zinc-500 border border-zinc-800 px-2 py-0.5 rounded">Frozen 2026</span>
+              <h3 className="font-semibold text-zinc-300">v1 BTC Strategy Lab (Streamlit)</h3>
+              <span className="text-xs text-zinc-500 border border-zinc-800 px-2 py-0.5 rounded">Prototype</span>
             </div>
             <ul className="space-y-2.5 text-sm text-zinc-400">
               <li className="flex items-start gap-2">
@@ -110,11 +110,11 @@ export default function Home() {
               </li>
               <li className="flex items-start gap-2">
                 <CheckCircle2 className="h-4 w-4 text-zinc-500 shrink-0 mt-0.5" />
-                <span>Official deliverable for PKL 2026 thesis paper</span>
+                <span>Foundational Bitcoin quantitative strategy prototype</span>
               </li>
               <li className="flex items-start gap-2">
                 <CheckCircle2 className="h-4 w-4 text-zinc-500 shrink-0 mt-0.5" />
-                <span>Synchronous Streamlit runtime on Community Cloud</span>
+                <span>Synchronous Streamlit research interface</span>
               </li>
             </ul>
           </div>
@@ -122,8 +122,8 @@ export default function Home() {
           {/* v2 Card */}
           <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/10 p-6 relative overflow-hidden">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-emerald-400">v2 Poly Strategy Lab (Next.js + FastAPI)</h3>
-              <span className="text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded">Active</span>
+              <h3 className="font-semibold text-emerald-400">v2 Poly Strategy Lab</h3>
+              <span className="text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded">Active Platform</span>
             </div>
             <ul className="space-y-2.5 text-sm text-zinc-300">
               <li className="flex items-start gap-2">
