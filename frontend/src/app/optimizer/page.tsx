@@ -1,16 +1,28 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Sliders, RefreshCw, Zap, TrendingUp, ShieldCheck, Target, Award, AlertCircle } from "lucide-react";
+import {
+  Sliders,
+  RefreshCw,
+  Zap,
+  TrendingUp,
+  ShieldCheck,
+  Target,
+  Award,
+  AlertCircle,
+  Plus,
+  X,
+} from "lucide-react";
 import { runOptimizer } from "@/lib/api-client";
 import { OptimizeResponse } from "@/types/api";
-
-const ASSETS = [
-  { symbol: "BTC-USD", name: "Bitcoin", icon: "₿" },
-  { symbol: "ETH-USD", name: "Ethereum", icon: "Ξ" },
-  { symbol: "SOL-USD", name: "Solana", icon: "◎" },
-  { symbol: "BNB-USD", name: "BNB", icon: "⬡" },
-];
+import {
+  Asset,
+  DEFAULT_CRYPTO_ASSETS,
+  getCustomAssets,
+  saveCustomAsset,
+  removeCustomAsset,
+  subscribeToCustomAssets,
+} from "@/lib/asset-store";
 
 const DEFAULT_BUY_THRESHOLDS = [15, 20, 25, 30, 35, 40];
 const DEFAULT_SELL_THRESHOLDS = [60, 65, 70, 75, 80, 85];
@@ -21,8 +33,19 @@ export default function OptimizerPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<OptimizeResponse | null>(null);
+  const [customAssets, setCustomAssets] = useState<Asset[]>([]);
+  const [customTickerInput, setCustomTickerInput] = useState("");
+  const [showCustomInput, setShowCustomInput] = useState(false);
 
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    setCustomAssets(getCustomAssets());
+    const unsubscribe = subscribeToCustomAssets((updated) => {
+      setCustomAssets(updated);
+    });
+    return () => unsubscribe();
+  }, []);
 
   const handleRunOptimizer = useCallback(async (targetSymbol: string) => {
     setError(null);
@@ -56,6 +79,30 @@ export default function OptimizerPage() {
     }
   }, []);
 
+  const handleAssetSelect = (newSymbol: string) => {
+    setSymbol(newSymbol);
+    setShowCustomInput(false);
+    handleRunOptimizer(newSymbol);
+  };
+
+  const handleCustomTickerSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customTickerInput.trim()) return;
+    const formatted = customTickerInput.trim().toUpperCase();
+    saveCustomAsset(formatted);
+    setCustomTickerInput("");
+    setShowCustomInput(false);
+    handleAssetSelect(formatted);
+  };
+
+  const handleRemoveCustomAsset = (e: React.MouseEvent, assetSymbol: string) => {
+    e.stopPropagation();
+    removeCustomAsset(assetSymbol);
+    if (symbol === assetSymbol) {
+      handleAssetSelect("BTC-USD");
+    }
+  };
+
   useEffect(() => {
     handleRunOptimizer(symbol);
     return () => {
@@ -81,22 +128,78 @@ export default function OptimizerPage() {
       </div>
 
       {/* Asset Switcher Pills */}
-      <div className="flex flex-wrap gap-2 mb-8">
-        {ASSETS.map((asset) => (
+      <div className="flex flex-wrap items-center gap-2 mb-8">
+        {[...DEFAULT_CRYPTO_ASSETS, ...customAssets].map((asset) => {
+          const isSelected = symbol === asset.symbol && !showCustomInput;
+          return (
+            <div
+              key={asset.symbol}
+              onClick={() => handleAssetSelect(asset.symbol)}
+              role="button"
+              tabIndex={0}
+              className={`group flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-medium transition-all cursor-pointer ${
+                isSelected
+                  ? "bg-cyan-500 text-zinc-950 shadow-md shadow-cyan-500/20 font-semibold"
+                  : "bg-zinc-900 border border-zinc-800 text-zinc-300 hover:border-zinc-700 hover:text-white"
+              }`}
+            >
+              <span className="font-bold">{asset.icon}</span>
+              <span>{asset.name}</span>
+              <span className="text-xs opacity-70">({asset.symbol})</span>
+
+              {asset.isCustom && (
+                <button
+                  type="button"
+                  onClick={(e) => handleRemoveCustomAsset(e, asset.symbol)}
+                  className={`ml-1 rounded p-0.5 transition-colors ${
+                    isSelected
+                      ? "text-zinc-950/70 hover:bg-cyan-600 hover:text-zinc-950"
+                      : "text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200"
+                  }`}
+                  title={`Remove ${asset.symbol}`}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </div>
+          );
+        })}
+
+        {!showCustomInput ? (
           <button
-            key={asset.symbol}
-            onClick={() => setSymbol(asset.symbol)}
-            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all ${
-              symbol === asset.symbol
-                ? "bg-cyan-500 text-zinc-950 shadow-md shadow-cyan-500/20 font-semibold"
-                : "bg-zinc-900 border border-zinc-800 text-zinc-300 hover:border-zinc-700 hover:text-white"
-            }`}
+            onClick={() => setShowCustomInput(true)}
+            className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium border border-dashed border-zinc-700 bg-zinc-900/60 text-zinc-400 hover:text-white hover:border-cyan-500 hover:bg-zinc-900 transition-all"
           >
-            <span className="font-bold">{asset.icon}</span>
-            <span>{asset.name}</span>
-            <span className="text-xs opacity-70">({asset.symbol})</span>
+            <Plus className="h-3.5 w-3.5" />
+            <span>Add Custom Asset</span>
           </button>
-        ))}
+        ) : (
+          <form onSubmit={handleCustomTickerSubmit} className="flex items-center gap-2">
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="e.g. AVAX-USD, SPY"
+                value={customTickerInput}
+                onChange={(e) => setCustomTickerInput(e.target.value)}
+                autoFocus
+                className="rounded-lg border border-cyan-500/50 bg-zinc-900 px-3 py-1.5 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-cyan-400 w-44 uppercase"
+              />
+            </div>
+            <button
+              type="submit"
+              className="rounded-lg bg-cyan-500 px-3 py-1.5 text-xs font-semibold text-zinc-950 hover:bg-cyan-400 transition-colors"
+            >
+              Optimize
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowCustomInput(false)}
+              className="rounded-lg border border-zinc-700 px-2 py-1.5 text-xs text-zinc-400 hover:text-white"
+            >
+              Cancel
+            </button>
+          </form>
+        )}
       </div>
 
       {error && (

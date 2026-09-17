@@ -59,3 +59,23 @@ def test_fetch_market_data_date_slicing(tmp_path):
         assert len(df) == 11
         assert str(df.index[0].date()) == "2023-01-10"
         assert str(df.index[-1].date()) == "2023-01-20"
+
+
+def test_supported_assets_contains_top_ten_crypto():
+    """Ensure SUPPORTED_ASSETS registers at least 10 major crypto assets with valid schema."""
+    assets = get_supported_assets()
+    assert len(assets) >= 10
+    symbols = [a["symbol"] for a in assets]
+    expected_top = ["BTC-USD", "ETH-USD", "SOL-USD", "BNB-USD", "XRP-USD", "ADA-USD", "DOGE-USD", "AVAX-USD", "LINK-USD", "NEAR-USD"]
+    for expected in expected_top:
+        assert expected in symbols
+
+    # Unique check
+    assert len(symbols) == len(set(symbols))
+
+    # Schema integrity
+    required_keys = {"symbol", "name", "category", "base_currency", "first_available_date", "is_active"}
+    for a in assets:
+        assert required_keys.issubset(a.keys())
+        assert a["is_active"] is True
+
