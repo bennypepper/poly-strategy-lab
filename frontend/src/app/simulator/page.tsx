@@ -55,10 +55,12 @@ function SimulatorContent() {
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const paramsRef = useRef({ buyThreshold, sellThreshold, allocBuyPct, initialCapital });
+  const symbolRef = useRef(symbol);
 
   useEffect(() => {
     paramsRef.current = { buyThreshold, sellThreshold, allocBuyPct, initialCapital };
-  }, [buyThreshold, sellThreshold, allocBuyPct, initialCapital]);
+    symbolRef.current = symbol;
+  }, [buyThreshold, sellThreshold, allocBuyPct, initialCapital, symbol]);
 
   // Sync state to URL parameters
   const updateUrlParams = (
@@ -80,7 +82,8 @@ function SimulatorContent() {
   };
 
   const handleRunSimulation = useCallback(
-    async (targetSymbol = symbol) => {
+    async (targetSymbol?: string) => {
+      const sym = targetSymbol || symbolRef.current;
       const { buyThreshold: buy, sellThreshold: sell, allocBuyPct: alloc, initialCapital: capital } = paramsRef.current;
       if (buy >= sell) {
         setError("Buy threshold must be strictly lower than sell threshold.");
@@ -95,13 +98,13 @@ function SimulatorContent() {
       const controller = new AbortController();
       abortControllerRef.current = controller;
 
-      updateUrlParams(targetSymbol, buy, sell, alloc, capital);
+      updateUrlParams(sym, buy, sell, alloc, capital);
 
       try {
         const [backtestRes, marketRes] = await Promise.all([
           runBacktest(
             {
-              symbol: targetSymbol,
+              symbol: sym,
               threshold_buy: buy,
               threshold_sell: sell,
               alloc_buy_pct: alloc,
@@ -109,9 +112,9 @@ function SimulatorContent() {
             },
             controller.signal
           ),
-          fetchMarketData(targetSymbol, undefined, undefined, controller.signal).catch((err: unknown) => {
-            console.warn(`Market data fetch failed for ${targetSymbol}:`, err);
-            return { symbol: targetSymbol, count: 0, data: [] };
+          fetchMarketData(sym, undefined, undefined, controller.signal).catch((err: unknown) => {
+            console.warn(`Market data fetch failed for ${sym}:`, err);
+            return { symbol: sym, count: 0, data: [] };
           }),
         ]);
 
@@ -127,8 +130,14 @@ function SimulatorContent() {
         setLoading(false);
       }
     },
-    [symbol]
+    []
   );
+
+  const handleAssetSelect = (newSymbol: string) => {
+    setSymbol(newSymbol);
+    setShowCustomInput(false);
+    handleRunSimulation(newSymbol);
+  };
 
   const handleShareLink = async () => {
     if (typeof window !== "undefined" && navigator.clipboard) {
@@ -146,8 +155,7 @@ function SimulatorContent() {
     e.preventDefault();
     if (!customTickerInput.trim()) return;
     const formatted = customTickerInput.trim().toUpperCase();
-    setSymbol(formatted);
-    setShowCustomInput(false);
+    handleAssetSelect(formatted);
   };
 
   useEffect(() => {
@@ -195,10 +203,7 @@ function SimulatorContent() {
         {PRESET_ASSETS.map((asset) => (
           <button
             key={asset.symbol}
-            onClick={() => {
-              setSymbol(asset.symbol);
-              setShowCustomInput(false);
-            }}
+            onClick={() => handleAssetSelect(asset.symbol)}
             className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all ${
               symbol === asset.symbol && !showCustomInput
                 ? "bg-emerald-500 text-zinc-950 shadow-md shadow-emerald-500/20 font-semibold"
@@ -429,6 +434,7 @@ function SimulatorContent() {
               {/* TradingView Lightweight Candlestick Chart */}
               {candles.length > 0 && (
                 <TradingViewCandlestick
+                  key={`candles-${symbol}`}
                   data={candles}
                   symbol={symbol}
                   height={380}
@@ -439,7 +445,11 @@ function SimulatorContent() {
 
               {/* TradingView Equity Curve */}
               {(result.equity_curve?.length ?? 0) > 0 && (
-                <TradingViewEquity data={result.equity_curve} height={280} />
+                <TradingViewEquity
+                  key={`equity-${symbol}`}
+                  data={result.equity_curve}
+                  height={280}
+                />
               )}
 
               {/* Trade Execution Log with Export Suite */}

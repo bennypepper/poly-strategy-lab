@@ -42,11 +42,13 @@ async function fetchWithTimeout(
   if (options.signal) {
     if (options.signal.aborted) {
       clearTimeout(timer);
-      throw options.signal.reason;
+      const abortErr = new Error("The user aborted a request");
+      abortErr.name = "AbortError";
+      throw abortErr;
     }
     options.signal.addEventListener("abort", () => {
       clearTimeout(timer);
-      controller.abort(options.signal?.reason);
+      controller.abort();
     });
   }
 
@@ -57,8 +59,13 @@ async function fetchWithTimeout(
     });
     return response;
   } catch (err: unknown) {
+    if (options.signal?.aborted) {
+      const abortErr = new Error("The user aborted a request");
+      abortErr.name = "AbortError";
+      throw abortErr;
+    }
     if (err instanceof Error && err.name === "AbortError") {
-      throw new ApiError(`Network request timed out or was cancelled: ${err.message}`, 408);
+      throw new ApiError(`Network request timed out after ${timeoutMs}ms`, 408);
     }
     const message = err instanceof Error ? err.message : "Unknown network connection failure";
     throw new ApiError(`Network error communicating with API at ${url}: ${message}`);

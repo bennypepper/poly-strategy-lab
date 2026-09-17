@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   createChart,
   AreaSeries,
   LineSeries,
   ColorType,
   CrosshairMode,
+  PriceScaleMode,
   IChartApi,
   Time,
 } from "lightweight-charts";
@@ -29,6 +30,8 @@ function normalizeDate(rawDate: string): string | null {
 export function TradingViewEquity({ data, height = 280 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
+  const [scaleMode, setScaleMode] = useState<"logarithmic" | "normal">("logarithmic");
+  const [showBenchmark, setShowBenchmark] = useState(true);
 
   useEffect(() => {
     if (!containerRef.current || !data || data.length === 0) return;
@@ -56,10 +59,15 @@ export function TradingViewEquity({ data, height = 280 }: Props) {
       rightPriceScale: {
         borderColor: "#27272a",
         visible: true,
+        mode: scaleMode === "logarithmic" ? PriceScaleMode.Logarithmic : PriceScaleMode.Normal,
       },
       timeScale: {
         borderColor: "#27272a",
         timeVisible: true,
+      },
+      localization: {
+        priceFormatter: (price: number) =>
+          "$" + Math.round(price).toLocaleString("en-US"),
       },
     });
 
@@ -84,19 +92,21 @@ export function TradingViewEquity({ data, height = 280 }: Props) {
       return;
     }
 
-    // Benchmark Series (Buy & Hold)
-    const benchmarkSeries = chart.addSeries(LineSeries, {
-      color: "#71717a",
-      lineWidth: 1,
-      lineStyle: 2,
-      title: "Buy & Hold",
-    });
+    // Benchmark Series (Buy & Hold) - conditional on showBenchmark
+    if (showBenchmark) {
+      const benchmarkSeries = chart.addSeries(LineSeries, {
+        color: "#71717a",
+        lineWidth: 1,
+        lineStyle: 2,
+        title: "Buy & Hold",
+      });
 
-    const benchPoints = sorted.map((d) => ({
-      time: d.date as Time,
-      value: typeof d.benchmark_equity === "number" && !isNaN(d.benchmark_equity) ? d.benchmark_equity : 0,
-    }));
-    benchmarkSeries.setData(benchPoints);
+      const benchPoints = sorted.map((d) => ({
+        time: d.date as Time,
+        value: typeof d.benchmark_equity === "number" && !isNaN(d.benchmark_equity) ? d.benchmark_equity : 0,
+      }));
+      benchmarkSeries.setData(benchPoints);
+    }
 
     // Strategy Series (Area)
     const strategySeries = chart.addSeries(AreaSeries, {
@@ -133,20 +143,62 @@ export function TradingViewEquity({ data, height = 280 }: Props) {
         chartRef.current = null;
       }
     };
-  }, [data, height]);
+  }, [data, height, scaleMode, showBenchmark]);
 
   return (
     <div className="w-full rounded-xl border border-zinc-800 bg-zinc-950 p-4">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="font-semibold text-white tracking-tight">Cumulative Portfolio Equity</h3>
-        <div className="flex items-center gap-4 text-xs">
-          <div className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-emerald-400"></span>
-            <span className="text-zinc-300">Strategy Equity</span>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
+        <div className="flex items-center gap-3">
+          <h3 className="font-semibold text-white tracking-tight">Cumulative Portfolio Equity</h3>
+          <span className="text-[11px] text-zinc-500 font-mono">
+            {scaleMode === "logarithmic" ? "Log Scale" : "Linear Scale"}
+          </span>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3 text-xs">
+          {/* Legend and Benchmark Toggle */}
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-emerald-400"></span>
+              <span className="text-zinc-300">Strategy</span>
+            </div>
+
+            <button
+              onClick={() => setShowBenchmark(!showBenchmark)}
+              className={`flex items-center gap-1.5 px-2 py-0.5 rounded border transition-colors ${
+                showBenchmark
+                  ? "border-zinc-700 bg-zinc-900 text-zinc-300 hover:text-white"
+                  : "border-zinc-800/60 bg-zinc-950 text-zinc-600 line-through"
+              }`}
+              title="Toggle Buy & Hold Benchmark"
+            >
+              <span className="h-1.5 w-3 rounded bg-zinc-500"></span>
+              <span>Buy & Hold</span>
+            </button>
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="h-2 w-4 rounded bg-zinc-500"></span>
-            <span className="text-zinc-400">Buy & Hold</span>
+
+          {/* Scale Mode Switcher */}
+          <div className="flex items-center rounded-lg border border-zinc-800 bg-zinc-900/80 p-0.5">
+            <button
+              onClick={() => setScaleMode("logarithmic")}
+              className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
+                scaleMode === "logarithmic"
+                  ? "bg-emerald-500 text-zinc-950 font-semibold shadow-sm"
+                  : "text-zinc-400 hover:text-zinc-200"
+              }`}
+            >
+              Log
+            </button>
+            <button
+              onClick={() => setScaleMode("normal")}
+              className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
+                scaleMode === "normal"
+                  ? "bg-emerald-500 text-zinc-950 font-semibold shadow-sm"
+                  : "text-zinc-400 hover:text-zinc-200"
+              }`}
+            >
+              Linear
+            </button>
           </div>
         </div>
       </div>
