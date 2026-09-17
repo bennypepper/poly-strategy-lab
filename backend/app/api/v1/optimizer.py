@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 from app.models.schemas import OptimizeRequest, OptimizeResponse
 from app.services.data_fetcher import fetch_market_data
 from app.engine.optimizer_grid import run_grid_search
+from app.indicators.dynamic_channel import classify_asset
 
 router = APIRouter(prefix="/optimize", tags=["Optimizer"])
 
@@ -34,6 +35,7 @@ async def optimize_parameters(req: OptimizeRequest):
     return OptimizeResponse(
         success=True,
         symbol=req.symbol,
+        asset_type=classify_asset(req.symbol),
         total_trials=res["total_trials"],
         target_alloc_for_heatmap=res["target_alloc_for_heatmap"],
         buy_thresholds=res["buy_thresholds"],

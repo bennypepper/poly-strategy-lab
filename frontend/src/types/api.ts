@@ -73,6 +73,7 @@ export interface BacktestParams {
 export interface BacktestResponse {
   success: boolean;
   symbol: string;
+  asset_type?: string;
   params: BacktestParams;
   metrics: StrategyMetrics;
   benchmark: BenchmarkMetrics;
@@ -92,6 +93,7 @@ export interface MarketDataPoint {
 
 export interface MarketDataResponse {
   symbol: string;
+  asset_type?: string;
   count: number;
   data: MarketDataPoint[];
 }
@@ -119,6 +121,7 @@ export interface OptimizeTrial {
 export interface OptimizeResponse {
   success: boolean;
   symbol: string;
+  asset_type?: string;
   total_trials: number;
   target_alloc_for_heatmap: number;
   buy_thresholds: number[];

@@ -3,6 +3,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 from scipy import stats
+import scipy.special as sp
 from scipy.signal import argrelextrema
 
 # ── BTC Ground Truth Constants ───────────────────────────────────────────────
@@ -149,9 +150,150 @@ def compute_generic_channel(close_series: pd.Series, window: int = 180) -> pd.Se
     return pd.Series(np.where(np.isfinite(raw), np.clip(raw, 0.0, 1.0) * 100.0, 50.0), index=dates, name="signal")
 
 
+def classify_asset(symbol: str) -> str:
+    """
+    Classify an asset into 'crypto' or 'equity'.
+    - 'crypto': pairs ending with -USD, -USDT, or recognized crypto symbols.
+    - 'equity': traditional equity and stock index ETF tickers (e.g. QQQ, SPY, AAPL, NVDA, MSFT).
+    """
+    sym_upper = symbol.strip().upper()
+    if (
+        sym_upper.endswith("-USD")
+        or sym_upper.endswith("-USDT")
+        or sym_upper.endswith("/USD")
+        or sym_upper.endswith("/USDT")
+    ):
+        return "crypto"
+
+    known_cryptos = {
+        "BTC", "ETH", "SOL", "BNB", "XRP", "ADA", "DOGE", "AVAX", "LINK", "NEAR",
+        "DOT", "MATIC", "LTC", "BCH", "UNI", "ATOM", "SHIB", "ICP", "FIL", "XLM",
+        "SUI", "APT", "PEPE", "HBAR", "RENDER", "FET", "INJ", "TIA"
+    }
+    if sym_upper in known_cryptos:
+        return "crypto"
+
+    return "equity"
+
+
+def compute_equity_channel(
+    close_series: pd.Series,
+    trend_window: int = 252,
+    vol_window: int = 63,
+) -> pd.Series:
+    """
+    Integrated Equity Compounding Channel with Secular Regime Trend Filtering.
+    - Causal rolling log-linear regression over trend_window (default 252 trading days).
+    - Standardized Gaussian valuation oscillator: Omega_t = 100 * Phi(Z_t).
+    - Dual-Regime Macro Trend Gate (50-EMA vs 200-EMA):
+      * Secular Bear (EMA50 <= EMA200): Forces defensive risk-off signal (95.0), protecting
+        against multi-year drawdowns (e.g. Dot-Com -83%, GFC -55%).
+      * Secular Bull (EMA50 > EMA200): Accumulates pullbacks (Omega_t <= 30), holds through
+        compounding runs, and trims parabolic extensions.
+    """
+    if not isinstance(close_series.index, pd.DatetimeIndex):
+        raise TypeError("close_series must have a DatetimeIndex.")
+
+    n = len(close_series)
+    dates = close_series.index
+    prices = close_series.values.astype(float)
+
+    valid = (prices > 0) & np.isfinite(prices)
+    if valid.sum() < 60:
+        return pd.Series(np.full(n, 50.0), index=dates, name="signal")
+
+    # Stage 1: Macro Secular Trend Regime
+    s = pd.Series(prices, index=dates)
+    ema_50 = s.ewm(span=50, adjust=False).mean().values
+    ema_200 = s.ewm(span=200, adjust=False).mean().values
+    regime = (ema_50 > ema_200).astype(int)
+
+    # Stage 2: Walk-Forward Causal Rolling Log-Linear Regression
+    log_p = np.full(n, np.nan)
+    log_p[valid] = np.log(prices[valid])
+
+    W = min(trend_window, int(valid.sum()))
+    if W < 30:
+        return pd.Series(np.full(n, 50.0), index=dates, name="signal")
+
+    x = np.arange(W, dtype=float)
+    x_bar = (W - 1) / 2.0
+    var_x = np.sum((x - x_bar) ** 2)
+
+    hat_y = np.full(n, np.nan)
+    for i in range(W - 1, n):
+        y_win = log_p[i - W + 1 : i + 1]
+        if np.all(np.isfinite(y_win)):
+            y_bar = np.mean(y_win)
+            cov_xy = np.sum((x - x_bar) * (y_win - y_bar))
+            slope = cov_xy / var_x
+            hat_y[i] = y_bar + slope * x_bar
+
+    # For earlier rows before W, use expanding window
+    for i in range(30, min(W - 1, n)):
+        y_win = log_p[: i + 1]
+        if np.all(np.isfinite(y_win)):
+            cur_w = i + 1
+            cur_x = np.arange(cur_w, dtype=float)
+            cur_x_bar = (cur_w - 1) / 2.0
+            cur_var_x = np.sum((cur_x - cur_x_bar) ** 2)
+            if cur_var_x > 1e-6:
+                y_bar = np.mean(y_win)
+                cov_xy = np.sum((cur_x - cur_x_bar) * (y_win - y_bar))
+                hat_y[i] = y_bar + (cov_xy / cur_var_x) * cur_x_bar
+
+    # Stage 3: Detrended Residuals & Z-Score
+    eps = np.full(n, np.nan)
+    valid_hat = np.isfinite(hat_y)
+    eps[valid_hat] = log_p[valid_hat] - hat_y[valid_hat]
+
+    eps_series = pd.Series(eps, index=dates)
+    roll_std = eps_series.rolling(window=vol_window, min_periods=20).std().bfill().ffill().values
+    safe_std = np.where((roll_std > 1e-4) & np.isfinite(roll_std), roll_std, 0.05)
+
+    z = np.where(valid_hat, eps / safe_std, 0.0)
+
+    # Stage 4: Gaussian Valuation Oscillator
+    omega = 100.0 * 0.5 * (1.0 + sp.erf(z / np.sqrt(2.0)))
+
+    # Stage 5: Gated Signal Synthesis
+    signal = np.full(n, 50.0)
+    for i in range(1, n):
+        if not valid_hat[i]:
+            signal[i] = 50.0
+        elif regime[i] == 0:
+            # Secular Bear: force defensive liquidation / prohibit buys
+            signal[i] = 95.0
+        elif regime[i] == 1 and regime[i - 1] == 0:
+            # Bull Initiation: trigger long entry
+            signal[i] = 10.0
+        elif omega[i] <= 30.0:
+            # Bull Pullback: accumulate value
+            signal[i] = max(5.0, float(omega[i]))
+        elif omega[i] >= 95.0:
+            # Parabolic extension in bull market: tactical trim
+            signal[i] = 95.0
+        else:
+            # Normal Bull Trend Compounding: Hold position
+            signal[i] = 50.0
+
+    return pd.Series(signal, index=dates, name="signal")
+
+
 def compute_normalized_signal(symbol: str, close_series: pd.Series) -> pd.Series:
-    """Entry point router: uses exact BTC calibration for BTC-USD, generic channel for others."""
-    sym_clean = symbol.upper().replace("-USD", "").replace("/", "")
+    """
+    Entry point router: selects the mathematically appropriate quantitative engine
+    based on the asset class:
+    - Equities & Stock Index ETFs (QQQ, SPY, etc.): Integrated Equity Compounding Channel with Secular Regime Filter.
+    - Bitcoin: Calibrated Macroeconomic Halving Adoption Model (Trolololo).
+    - Altcoins & Crypto Pairs: Empirical Adaptive Logarithmic Channel.
+    """
+    asset_type = classify_asset(symbol)
+    if asset_type == "equity":
+        return compute_equity_channel(close_series)
+
+    sym_clean = symbol.upper().replace("-USD", "").replace("-USDT", "").replace("/", "")
     if sym_clean in ("BTC", "BITCOIN"):
         return compute_btc_trolololo(close_series)
     return compute_generic_channel(close_series)
+

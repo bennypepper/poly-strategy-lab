@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 from app.models.schemas import BacktestRequest, BacktestResponse
 from app.services.data_fetcher import fetch_market_data
 from app.engine.backtest_numba import run_backtest_full_trace
+from app.indicators.dynamic_channel import classify_asset
 
 router = APIRouter(prefix="/backtest", tags=["Backtest"])
 
@@ -37,6 +38,7 @@ async def execute_backtest(req: BacktestRequest):
     return BacktestResponse(
         success=True,
         symbol=req.symbol,
+        asset_type=classify_asset(req.symbol),
         params=req.model_dump(),
         metrics=result["metrics"],
         benchmark=result["benchmark"],

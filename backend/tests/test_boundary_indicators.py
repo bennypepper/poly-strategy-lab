@@ -4,7 +4,9 @@ import pytest
 from app.indicators.dynamic_channel import (
     compute_btc_trolololo,
     compute_generic_channel,
+    compute_equity_channel,
     compute_normalized_signal,
+    classify_asset,
 )
 
 def test_generic_channel_insufficient_data():
@@ -51,3 +53,50 @@ def test_compute_normalized_signal_routing():
     sig_sol = compute_normalized_signal("SOL-USD", prices)
     assert isinstance(sig_btc, pd.Series)
     assert isinstance(sig_sol, pd.Series)
+
+def test_classify_asset_distinguishes_crypto_and_equity():
+    """Asset classifier must accurately categorize crypto pairs vs standard equity tickers."""
+    assert classify_asset("BTC-USD") == "crypto"
+    assert classify_asset("ETH-USD") == "crypto"
+    assert classify_asset("SOL-USDT") == "crypto"
+    assert classify_asset("DOGE") == "crypto"
+    assert classify_asset("AVAX") == "crypto"
+    assert classify_asset("QQQ") == "equity"
+    assert classify_asset("SPY") == "equity"
+    assert classify_asset("AAPL") == "equity"
+    assert classify_asset("NVDA") == "equity"
+    assert classify_asset("MSFT") == "equity"
+
+def test_compute_equity_channel_insufficient_data():
+    """Less than 60 data points should gracefully return 50.0 without crashing."""
+    dates = pd.date_range("2023-01-01", periods=30, freq="D")
+    prices = pd.Series(np.linspace(100, 150, 30), index=dates)
+    sig = compute_equity_channel(prices)
+    assert len(sig) == 30
+    assert (sig == 50.0).all()
+
+def test_compute_equity_channel_non_datetime_index_raises():
+    """Non-DatetimeIndex must raise TypeError explicitly."""
+    s = pd.Series([100.0, 105.0, 110.0])
+    with pytest.raises(TypeError, match="DatetimeIndex"):
+        compute_equity_channel(s)
+
+def test_compute_equity_channel_bounded_signal():
+    """Equity channel must generate strictly bounded [0, 100] signals across long series."""
+    dates = pd.date_range("2015-01-01", periods=400, freq="D")
+    prices = pd.Series(np.exp(np.linspace(4.0, 6.0, 400)) + np.random.normal(0, 5, 400), index=dates)
+    sig = compute_equity_channel(prices)
+    assert len(sig) == 400
+    assert not sig.isna().any()
+    assert (sig >= 0.0).all()
+    assert (sig <= 100.0).all()
+
+def test_compute_normalized_signal_routes_equity_to_equity_channel():
+    """Routing QQQ must activate equity channel without error."""
+    dates = pd.date_range("2020-01-01", periods=300, freq="D")
+    prices = pd.Series(np.linspace(200, 400, 300), index=dates)
+    sig_qqq = compute_normalized_signal("QQQ", prices)
+    assert isinstance(sig_qqq, pd.Series)
+    assert len(sig_qqq) == 300
+    assert not sig_qqq.isna().any()
+

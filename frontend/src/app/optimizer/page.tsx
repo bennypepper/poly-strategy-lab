@@ -273,6 +273,47 @@ export default function OptimizerPage() {
 
       {result && !loading && (
         <div className="space-y-8">
+          {/* Quantitative Engine Indicator */}
+          {result.asset_type === "equity" ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-blue-500/25 bg-blue-950/20 px-4 py-3.5 text-xs text-zinc-300">
+              <div className="flex items-center gap-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400">
+                  <TrendingUp className="h-4 w-4" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-white">Quantitative Engine:</span>
+                    <span className="rounded-full bg-blue-500/20 border border-blue-500/30 px-2 py-0.5 text-[11px] font-medium text-blue-300">
+                      Equity Compounding Model
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-[11px] text-zinc-400">
+                    Causal log-linear growth trend with dynamic volatility bands and 50/200 EMA secular regime gating to protect against multi-year bear markets.
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-500/25 bg-emerald-950/20 px-4 py-3.5 text-xs text-zinc-300">
+              <div className="flex items-center gap-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                  <Zap className="h-4 w-4" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-white">Quantitative Engine:</span>
+                    <span className="rounded-full bg-emerald-500/20 border border-emerald-500/30 px-2 py-0.5 text-[11px] font-medium text-emerald-300">
+                      Crypto Power-Law Model
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-[11px] text-zinc-400">
+                    Scale-invariant logarithmic adoption trajectory with dynamic quantile band normalization calibrated for cryptocurrency halving cycles.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Transfer Guidance Banner */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-cyan-500/20 bg-cyan-950/10 p-4 text-xs text-zinc-300">
             <div className="flex items-center gap-2.5">

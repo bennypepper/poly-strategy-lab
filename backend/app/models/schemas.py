@@ -67,6 +67,7 @@ class TradeLog(BaseModel):
 class BacktestResponse(BaseModel):
     success: bool
     symbol: str
+    asset_type: str = "crypto"
     params: dict
     metrics: StrategyMetrics
     benchmark: BenchmarkMetrics
@@ -84,6 +85,7 @@ class MarketDataPoint(BaseModel):
 
 class MarketDataResponse(BaseModel):
     symbol: str
+    asset_type: str = "crypto"
     count: int
     data: List[MarketDataPoint]
 
@@ -98,6 +100,7 @@ class OptimizeRequest(BaseModel):
 class OptimizeResponse(BaseModel):
     success: bool
     symbol: str
+    asset_type: str = "crypto"
     total_trials: int
     target_alloc_for_heatmap: float
     buy_thresholds: List[int]

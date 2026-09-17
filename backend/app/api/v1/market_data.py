@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Query
 from typing import Optional
 from app.models.schemas import MarketDataResponse, MarketDataPoint
 from app.services.data_fetcher import fetch_market_data
+from app.indicators.dynamic_channel import classify_asset
 
 router = APIRouter(prefix="/market-data", tags=["Market Data"])
 
@@ -31,4 +32,9 @@ async def get_market_data(
             )
         )
 
-    return MarketDataResponse(symbol=symbol, count=len(points), data=points)
+    return MarketDataResponse(
+        symbol=symbol,
+        asset_type=classify_asset(symbol),
+        count=len(points),
+        data=points,
+    )
