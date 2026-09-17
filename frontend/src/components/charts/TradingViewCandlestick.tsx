@@ -1,7 +1,15 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { createChart, CandlestickSeries, LineSeries, ColorType, CrosshairMode, IChartApi } from "lightweight-charts";
+import {
+  createChart,
+  CandlestickSeries,
+  LineSeries,
+  ColorType,
+  CrosshairMode,
+  IChartApi,
+  Time,
+} from "lightweight-charts";
 
 interface CandlestickDataPoint {
   date: string;
@@ -18,6 +26,18 @@ interface Props {
   height?: number;
   buyThreshold?: number;
   sellThreshold?: number;
+}
+
+/**
+ * Normalizes any valid ISO / date string to strict YYYY-MM-DD format for Lightweight Charts.
+ */
+function normalizeDate(rawDate: string): string | null {
+  if (!rawDate) return null;
+  const match = rawDate.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (match) return match[1];
+  const parsed = new Date(rawDate);
+  if (isNaN(parsed.getTime())) return null;
+  return parsed.toISOString().split("T")[0];
 }
 
 export function TradingViewCandlestick({
@@ -39,7 +59,9 @@ export function TradingViewCandlestick({
       chartRef.current = null;
     }
 
+    const initialWidth = containerRef.current.clientWidth;
     const chart = createChart(containerRef.current, {
+      width: initialWidth > 0 ? initialWidth : undefined,
       height,
       layout: {
         background: { type: ColorType.Solid, color: "#09090b" },
@@ -74,11 +96,28 @@ export function TradingViewCandlestick({
       wickDownColor: "#ef4444",
     });
 
-    // Format data and sort ascending by date
-    const sorted = [...data].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    // Normalize dates, deduplicate by date, and sort strictly ascending
+    // Lightweight Charts throws a fatal assertion if timestamps are duplicate or unordered
+    const dateMap = new Map<string, CandlestickDataPoint>();
+    for (const d of data) {
+      const normalized = normalizeDate(d.date);
+      if (normalized) {
+        dateMap.set(normalized, { ...d, date: normalized });
+      }
+    }
+
+    const sorted = Array.from(dateMap.values()).sort((a, b) =>
+      a.date.localeCompare(b.date)
+    );
+
+    if (sorted.length === 0) {
+      chart.remove();
+      chartRef.current = null;
+      return;
+    }
 
     const formattedCandles = sorted.map((d) => ({
-      time: d.date as any,
+      time: d.date as Time,
       open: d.open,
       high: d.high,
       low: d.low,
@@ -88,7 +127,7 @@ export function TradingViewCandlestick({
     candleSeries.setData(formattedCandles);
 
     // If signal data is available, add Signal Line on a separate left scale
-    const hasSignal = sorted.some((d) => d.signal !== undefined);
+    const hasSignal = sorted.some((d) => d.signal !== undefined && d.signal !== null);
     if (hasSignal) {
       chart.applyOptions({
         leftPriceScale: {
@@ -105,8 +144,8 @@ export function TradingViewCandlestick({
       });
 
       const formattedSignals = sorted.map((d) => ({
-        time: d.date as any,
-        value: d.signal ?? 50.0,
+        time: d.date as Time,
+        value: typeof d.signal === "number" && !isNaN(d.signal) ? d.signal : 50.0,
       }));
 
       signalSeries.setData(formattedSignals);

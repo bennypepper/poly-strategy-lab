@@ -26,6 +26,8 @@ async def optimize_parameters(req: OptimizeRequest):
             fee_rate=req.fee_rate,
             signal_col="signal",
         )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid parameter configuration: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Grid search error: {str(e)}")
 

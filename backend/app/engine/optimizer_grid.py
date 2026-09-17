@@ -19,6 +19,11 @@ def run_grid_search(
     Exhaustive grid search across threshold and allocation combinations using Numba.
     Returns optimal parameter rankings and 2D sensitivity matrix.
     """
+    if not alloc_pcts:
+        raise ValueError("alloc_pcts cannot be empty.")
+    if not buy_thresholds or not sell_thresholds:
+        raise ValueError("buy_thresholds and sell_thresholds cannot be empty.")
+
     signals = df[signal_col].values.astype(float)
     prices_open = df["open"].values.astype(float)
     prices_close = df["close"].values.astype(float)

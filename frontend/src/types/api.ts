@@ -58,10 +58,22 @@ export interface TradeLog {
   port_value: number;
 }
 
+export interface BacktestParams {
+  symbol?: string;
+  threshold_buy?: number;
+  threshold_sell?: number;
+  alloc_buy_pct?: number;
+  initial_capital?: number;
+  fee_rate?: number;
+  start_date?: string | null;
+  end_date?: string | null;
+  [key: string]: unknown;
+}
+
 export interface BacktestResponse {
   success: boolean;
   symbol: string;
-  params: Record<string, any>;
+  params: BacktestParams;
   metrics: StrategyMetrics;
   benchmark: BenchmarkMetrics;
   equity_curve: EquityPoint[];

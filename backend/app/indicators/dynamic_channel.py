@@ -84,7 +84,8 @@ def compute_btc_trolololo(btc_close: pd.Series, algo_window: int = 365) -> pd.Se
 
     if len(hi_idx) < 2 or len(lo_idx) < 2:
         channel_range = top_base - bottom_base
-        raw = np.where(valid & (channel_range > 0), (price_log - bottom_base) / channel_range, np.nan)
+        safe_range_early = np.where(channel_range > 0, channel_range, 1.0)
+        raw = np.where(valid & (channel_range > 0), (price_log - bottom_base) / safe_range_early, np.nan)
         return pd.Series(np.where(np.isfinite(raw), np.clip(raw, 0.0, 1.0) * 100.0, np.nan), index=dates, name="signal")
 
     hi_y = res_top[hi_idx].copy()
@@ -99,8 +100,9 @@ def compute_btc_trolololo(btc_close: pd.Series, algo_window: int = 365) -> pd.Se
     channel_top = top_base + top_drift
     channel_bottom = bottom_base + bottom_drift
     channel_range = channel_top - channel_bottom
+    safe_range = np.where(channel_range > 1e-6, channel_range, 1.0)
 
-    raw = np.where(valid & (channel_range > 1e-6), (price_log - channel_bottom) / channel_range, np.nan)
+    raw = np.where(valid & (channel_range > 1e-6), (price_log - channel_bottom) / safe_range, np.nan)
     return pd.Series(np.where(np.isfinite(raw), np.clip(raw, 0.0, 1.0) * 100.0, np.nan), index=dates, name="signal")
 
 
@@ -141,8 +143,9 @@ def compute_generic_channel(close_series: pd.Series, window: int = 180) -> pd.Se
     channel_top = trend_all + roll_top
     channel_bottom = trend_all + roll_bottom
     channel_range = channel_top - channel_bottom
+    safe_range = np.where(channel_range > 1e-6, channel_range, 1.0)
 
-    raw = np.where(valid & (channel_range > 1e-6), (np.log(prices) - channel_bottom) / channel_range, np.nan)
+    raw = np.where(valid & (channel_range > 1e-6), (np.log(prices) - channel_bottom) / safe_range, np.nan)
     return pd.Series(np.where(np.isfinite(raw), np.clip(raw, 0.0, 1.0) * 100.0, 50.0), index=dates, name="signal")
 
 

@@ -23,6 +23,9 @@ def run_backtest_numba(
     Returns: (total_return, max_drawdown, sharpe_ratio, wins, sell_count, trade_count)
     """
     n_days = len(signals)
+    if n_days < 2 or initial_cash <= 0.0:
+        return 0.0, 0.0, 0.0, 0, 0, 0
+
     cash = initial_cash
     holdings = 0.0
     trade_count = 0
@@ -110,6 +113,11 @@ def run_backtest_full_trace(
     signal_col: str = "signal",
 ) -> Dict[str, Any]:
     """Full trace simulation returning equity curve and execution logs."""
+    if not isinstance(df.index, pd.DatetimeIndex):
+        raise TypeError("DataFrame index must be a DatetimeIndex.")
+    if initial_cash <= 0.0:
+        raise ValueError("initial_cash must be strictly greater than 0.")
+
     n_days = len(df)
     if n_days < 2:
         raise ValueError("DataFrame must contain at least 2 rows for execution.")
@@ -136,6 +144,8 @@ def run_backtest_full_trace(
     trade_count = 0
     wins = 0
     sell_count = 0
+    gross_profit = 0.0
+    gross_loss = 0.0
 
     for i in range(n_days - 1):
         sig = signals[i]
@@ -154,7 +164,7 @@ def run_backtest_full_trace(
 
         if sig <= threshold_buy:
             trade_amount = cash * alloc_buy_pct
-            if trade_amount > 1.0:
+            if trade_amount > 1.0 and p_exec > 0.0:
                 fee = trade_amount * fee_rate
                 net_usd = trade_amount - fee
                 units_bought = net_usd / p_exec
@@ -172,21 +182,28 @@ def run_backtest_full_trace(
                     "cost": float(trade_amount),
                     "cash_after": float(cash),
                     "port_value": float(cash + (holdings * p_close)),
+                    "pnl": 0.0,
                 })
 
         elif sig >= threshold_sell:
             units_sold = holdings * alloc_sell_pct
-            if units_sold > 0.000001:
+            if units_sold > 0.000001 and p_exec > 0.0:
                 gross_usd = units_sold * p_exec
                 fee = gross_usd * fee_rate
                 net_usd = gross_usd - fee
                 cost_sold = units_sold * avg_entry_price
+                trade_pnl = net_usd - cost_sold
+
                 cash += net_usd
                 holdings -= units_sold
                 trade_count += 1
                 sell_count += 1
-                if net_usd > cost_sold:
+                if trade_pnl > 0.0:
                     wins += 1
+                    gross_profit += trade_pnl
+                elif trade_pnl < 0.0:
+                    gross_loss += abs(trade_pnl)
+
                 trade_log.append({
                     "date": str(dates[i + 1].date()),
                     "type": "SELL",
@@ -195,6 +212,7 @@ def run_backtest_full_trace(
                     "cost": float(gross_usd),
                     "cash_after": float(cash),
                     "port_value": float(cash + (holdings * p_close)),
+                    "pnl": round(float(trade_pnl), 2),
                 })
 
     final_close = prices_close[-1]
@@ -205,7 +223,7 @@ def run_backtest_full_trace(
     dr[-1] = (pv[-1] - prev) / prev if prev > 0 else 0.0
 
     # Benchmark: Buy & Hold
-    bh_units = (initial_cash * (1.0 - fee_rate)) / prices_open[0]
+    bh_units = (initial_cash * (1.0 - fee_rate)) / prices_open[0] if prices_open[0] > 0 else 0.0
     bh_pv = bh_units * prices_close
     bh_return = (bh_pv[-1] - initial_cash) / initial_cash
     bh_daily_ret = np.diff(prices_close) / prices_close[:-1]
@@ -221,7 +239,7 @@ def run_backtest_full_trace(
 
     bh_std = float(np.std(bh_daily_ret))
     rf_daily = 0.04 / 365.0
-    bh_sharpe = float(((np.mean(bh_daily_ret) - rf_daily) / bh_std) * np.sqrt(365.0)) if bh_std > 0 else 0.0
+    bh_sharpe = float(((np.mean(bh_daily_ret) - rf_daily) / bh_std) * np.sqrt(365.0)) if bh_std > 1e-8 else 0.0
 
     # Strategy Metrics
     total_return = float((pv[-1] - initial_cash) / initial_cash)
@@ -237,12 +255,17 @@ def run_backtest_full_trace(
     returns_slice = dr[1:] if len(dr) > 1 else dr
     std_ret = float(np.std(returns_slice))
     mean_ret = float(np.mean(returns_slice))
-    sharpe = float(((mean_ret - rf_daily) / std_ret) * np.sqrt(365.0)) if std_ret > 0 else 0.0
+
+    sharpe = 0.0
+    if std_ret > 1e-8:
+        sharpe = float(((mean_ret - rf_daily) / std_ret) * np.sqrt(365.0))
 
     # Sortino ratio (downside deviation)
     negative_returns = returns_slice[returns_slice < 0]
     downside_std = float(np.std(negative_returns)) if len(negative_returns) > 0 else 0.0
-    sortino = float(((mean_ret - rf_daily) / downside_std) * np.sqrt(365.0)) if downside_std > 0 else 0.0
+    sortino = 0.0
+    if downside_std > 1e-8:
+        sortino = float(((mean_ret - rf_daily) / downside_std) * np.sqrt(365.0))
 
     # CAGR
     years = max((dates[-1] - dates[0]).days / 365.25, 0.1)
@@ -250,6 +273,14 @@ def run_backtest_full_trace(
     calmar = float(cagr / mdd) if mdd > 0 else 0.0
 
     win_rate = float(wins / sell_count) if sell_count > 0 else 0.0
+
+    # True Profit Factor (Gross Profits / Gross Losses)
+    if gross_loss > 1e-6:
+        profit_factor = round(float(gross_profit / gross_loss), 2)
+    elif gross_profit > 1e-6:
+        profit_factor = 999.0
+    else:
+        profit_factor = 0.0
 
     # Equity points
     equity_curve = []
@@ -289,7 +320,7 @@ def run_backtest_full_trace(
             "win_rate_pct": round(win_rate * 100.0, 2),
             "total_trades": int(trade_count),
             "profitable_trades": int(wins),
-            "profit_factor": round(float(wins / max(1, sell_count - wins)), 2),
+            "profit_factor": float(profit_factor),
         },
         "benchmark": {
             "buy_hold_return_pct": round(bh_return * 100.0, 2),

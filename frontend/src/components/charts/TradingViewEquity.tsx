@@ -1,12 +1,29 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { createChart, AreaSeries, LineSeries, ColorType, CrosshairMode, IChartApi } from "lightweight-charts";
+import {
+  createChart,
+  AreaSeries,
+  LineSeries,
+  ColorType,
+  CrosshairMode,
+  IChartApi,
+  Time,
+} from "lightweight-charts";
 import { EquityPoint } from "@/types/api";
 
 interface Props {
   data: EquityPoint[];
   height?: number;
+}
+
+function normalizeDate(rawDate: string): string | null {
+  if (!rawDate) return null;
+  const match = rawDate.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (match) return match[1];
+  const parsed = new Date(rawDate);
+  if (isNaN(parsed.getTime())) return null;
+  return parsed.toISOString().split("T")[0];
 }
 
 export function TradingViewEquity({ data, height = 280 }: Props) {
@@ -21,7 +38,9 @@ export function TradingViewEquity({ data, height = 280 }: Props) {
       chartRef.current = null;
     }
 
+    const initialWidth = containerRef.current.clientWidth;
     const chart = createChart(containerRef.current, {
+      width: initialWidth > 0 ? initialWidth : undefined,
       height,
       layout: {
         background: { type: ColorType.Solid, color: "#09090b" },
@@ -46,6 +65,25 @@ export function TradingViewEquity({ data, height = 280 }: Props) {
 
     chartRef.current = chart;
 
+    // Deduplicate and strictly sort ascending by date
+    const dateMap = new Map<string, EquityPoint>();
+    for (const d of data) {
+      const normalized = normalizeDate(d.date);
+      if (normalized) {
+        dateMap.set(normalized, { ...d, date: normalized });
+      }
+    }
+
+    const sorted = Array.from(dateMap.values()).sort((a, b) =>
+      a.date.localeCompare(b.date)
+    );
+
+    if (sorted.length === 0) {
+      chart.remove();
+      chartRef.current = null;
+      return;
+    }
+
     // Benchmark Series (Buy & Hold)
     const benchmarkSeries = chart.addSeries(LineSeries, {
       color: "#71717a",
@@ -54,9 +92,9 @@ export function TradingViewEquity({ data, height = 280 }: Props) {
       title: "Buy & Hold",
     });
 
-    const benchPoints = data.map((d) => ({
-      time: d.date as any,
-      value: d.benchmark_equity,
+    const benchPoints = sorted.map((d) => ({
+      time: d.date as Time,
+      value: typeof d.benchmark_equity === "number" && !isNaN(d.benchmark_equity) ? d.benchmark_equity : 0,
     }));
     benchmarkSeries.setData(benchPoints);
 
@@ -69,9 +107,9 @@ export function TradingViewEquity({ data, height = 280 }: Props) {
       title: "Strategy",
     });
 
-    const stratPoints = data.map((d) => ({
-      time: d.date as any,
-      value: d.equity,
+    const stratPoints = sorted.map((d) => ({
+      time: d.date as Time,
+      value: typeof d.equity === "number" && !isNaN(d.equity) ? d.equity : 0,
     }));
     strategySeries.setData(stratPoints);
 
