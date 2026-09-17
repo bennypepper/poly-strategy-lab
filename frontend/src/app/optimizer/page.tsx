@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
 import {
   Sliders,
   RefreshCw,
@@ -12,6 +13,8 @@ import {
   AlertCircle,
   Plus,
   X,
+  Play,
+  ArrowRight,
 } from "lucide-react";
 import { runOptimizer } from "@/lib/api-client";
 import { OptimizeResponse } from "@/types/api";
@@ -29,6 +32,7 @@ const DEFAULT_SELL_THRESHOLDS = [60, 65, 70, 75, 80, 85];
 const DEFAULT_ALLOC_PCTS = [0.4, 0.6, 0.8, 1.0];
 
 export default function OptimizerPage() {
+  const router = useRouter();
   const [symbol, setSymbol] = useState("BTC-USD");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -101,6 +105,12 @@ export default function OptimizerPage() {
     if (symbol === assetSymbol) {
       handleAssetSelect("BTC-USD");
     }
+  };
+
+  const handleApplyToSimulator = (buy: number, sell: number, alloc: number) => {
+    router.push(
+      `/simulator?symbol=${encodeURIComponent(symbol)}&buy=${buy}&sell=${sell}&alloc=${alloc}`
+    );
   };
 
   useEffect(() => {
@@ -202,6 +212,41 @@ export default function OptimizerPage() {
         )}
       </div>
 
+      {/* Action Bar with Explicit Optimize Button & Scope */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 mb-8">
+        <div>
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-semibold text-white">
+              Optimization Target: <span className="text-cyan-400 font-mono">{symbol}</span>
+            </h2>
+            <span className="rounded-full bg-cyan-500/10 border border-cyan-500/20 px-2 py-0.5 text-[10px] font-medium text-cyan-400">
+              144 Combinations
+            </span>
+          </div>
+          <p className="mt-1 text-xs text-zinc-400">
+            Searches Buy ≤ [15..40] × Sell ≥ [60..85] × Alloc [40%..100%] via compiled Numba engine.
+          </p>
+        </div>
+
+        <button
+          onClick={() => handleRunOptimizer(symbol)}
+          disabled={loading}
+          className="inline-flex items-center justify-center gap-2 rounded-lg bg-cyan-500 px-4 py-2 text-xs font-semibold text-zinc-950 shadow-md shadow-cyan-500/20 hover:bg-cyan-400 transition-all disabled:opacity-50 shrink-0"
+        >
+          {loading ? (
+            <>
+              <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+              <span>Optimizing 144 Trials...</span>
+            </>
+          ) : (
+            <>
+              <Play className="h-3.5 w-3.5 fill-current" />
+              <span>Run Parameter Optimization</span>
+            </>
+          )}
+        </button>
+      </div>
+
       {error && (
         <div className="mb-6 rounded-xl border border-red-500/30 bg-red-950/20 p-4 text-sm text-red-400 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -228,68 +273,141 @@ export default function OptimizerPage() {
 
       {result && !loading && (
         <div className="space-y-8">
+          {/* Transfer Guidance Banner */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-cyan-500/20 bg-cyan-950/10 p-4 text-xs text-zinc-300">
+            <div className="flex items-center gap-2.5">
+              <Zap className="h-4 w-4 text-cyan-400 shrink-0" />
+              <span>
+                <strong>Grid Search Complete:</strong> Evaluated {result.total_trials} parameter sets for {symbol}. Click <strong>&quot;Apply to Simulator&quot;</strong> on any card or table row to test and view candlestick charts and equity curves.
+              </span>
+            </div>
+            {result.best_by_sharpe && (
+              <button
+                onClick={() =>
+                  handleApplyToSimulator(
+                    result.best_by_sharpe.threshold_buy,
+                    result.best_by_sharpe.threshold_sell,
+                    result.best_by_sharpe.alloc_buy_pct
+                  )
+                }
+                className="inline-flex items-center gap-1.5 shrink-0 rounded-lg bg-cyan-500 px-3 py-1.5 text-xs font-semibold text-zinc-950 hover:bg-cyan-400 transition-colors"
+              >
+                <span>Launch Best Sharpe Setup</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+
           {/* Optimal Configurations Overview */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             {result.best_by_return && (
-              <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/10 p-5">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
-                    <TrendingUp className="h-3.5 w-3.5" /> Best Total Return
-                  </span>
-                  <span className="text-xs text-zinc-400">
-                    Alloc: {Math.round((result.best_by_return.alloc_buy_pct ?? 0) * 100)}%
-                  </span>
+              <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/10 p-5 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                      <TrendingUp className="h-3.5 w-3.5" /> Best Total Return
+                    </span>
+                    <span className="text-xs text-zinc-400">
+                      Alloc: {Math.round((result.best_by_return.alloc_buy_pct ?? 0) * 100)}%
+                    </span>
+                  </div>
+                  <div className="text-2xl font-extrabold text-white">
+                    +{result.best_by_return.total_return_pct ?? 0}%
+                  </div>
+                  <div className="mt-3 flex items-center justify-between text-xs text-zinc-400 border-t border-emerald-500/20 pt-2">
+                    <span>Buy ≤ <strong className="text-emerald-400">{result.best_by_return.threshold_buy}</strong></span>
+                    <span>Sell ≥ <strong className="text-cyan-400">{result.best_by_return.threshold_sell}</strong></span>
+                    <span>MDD: <strong>-{result.best_by_return.max_drawdown_pct ?? 0}%</strong></span>
+                  </div>
                 </div>
-                <div className="text-2xl font-extrabold text-white">
-                  +{result.best_by_return.total_return_pct ?? 0}%
-                </div>
-                <div className="mt-3 flex items-center justify-between text-xs text-zinc-400 border-t border-emerald-500/20 pt-2">
-                  <span>Buy ≤ <strong className="text-emerald-400">{result.best_by_return.threshold_buy}</strong></span>
-                  <span>Sell ≥ <strong className="text-cyan-400">{result.best_by_return.threshold_sell}</strong></span>
-                  <span>MDD: <strong>-{result.best_by_return.max_drawdown_pct ?? 0}%</strong></span>
-                </div>
+
+                <button
+                  onClick={() =>
+                    handleApplyToSimulator(
+                      result.best_by_return.threshold_buy,
+                      result.best_by_return.threshold_sell,
+                      result.best_by_return.alloc_buy_pct
+                    )
+                  }
+                  className="mt-4 w-full flex items-center justify-center gap-1.5 rounded-lg bg-emerald-500/20 border border-emerald-500/40 px-3 py-2 text-xs font-semibold text-emerald-300 hover:bg-emerald-500 hover:text-zinc-950 transition-colors"
+                >
+                  <span>Apply to Simulator</span>
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </button>
               </div>
             )}
 
             {result.best_by_sharpe && (
-              <div className="rounded-xl border border-cyan-500/30 bg-cyan-950/10 p-5">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-cyan-400 flex items-center gap-1.5">
-                    <Award className="h-3.5 w-3.5" /> Best Sharpe Ratio
-                  </span>
-                  <span className="text-xs text-zinc-400">
-                    Alloc: {Math.round((result.best_by_sharpe.alloc_buy_pct ?? 0) * 100)}%
-                  </span>
+              <div className="rounded-xl border border-cyan-500/30 bg-cyan-950/10 p-5 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-cyan-400 flex items-center gap-1.5">
+                      <Award className="h-3.5 w-3.5" /> Best Sharpe Ratio
+                    </span>
+                    <span className="text-xs text-zinc-400">
+                      Alloc: {Math.round((result.best_by_sharpe.alloc_buy_pct ?? 0) * 100)}%
+                    </span>
+                  </div>
+                  <div className="text-2xl font-extrabold text-white">
+                    {result.best_by_sharpe.sharpe_ratio != null ? result.best_by_sharpe.sharpe_ratio.toFixed(2) : "N/A"}
+                  </div>
+                  <div className="mt-3 flex items-center justify-between text-xs text-zinc-400 border-t border-cyan-500/20 pt-2">
+                    <span>Buy ≤ <strong className="text-emerald-400">{result.best_by_sharpe.threshold_buy}</strong></span>
+                    <span>Sell ≥ <strong className="text-cyan-400">{result.best_by_sharpe.threshold_sell}</strong></span>
+                    <span>Return: <strong>+{result.best_by_sharpe.total_return_pct ?? 0}%</strong></span>
+                  </div>
                 </div>
-                <div className="text-2xl font-extrabold text-white">
-                  {result.best_by_sharpe.sharpe_ratio != null ? result.best_by_sharpe.sharpe_ratio.toFixed(2) : "N/A"}
-                </div>
-                <div className="mt-3 flex items-center justify-between text-xs text-zinc-400 border-t border-cyan-500/20 pt-2">
-                  <span>Buy ≤ <strong className="text-emerald-400">{result.best_by_sharpe.threshold_buy}</strong></span>
-                  <span>Sell ≥ <strong className="text-cyan-400">{result.best_by_sharpe.threshold_sell}</strong></span>
-                  <span>Return: <strong>+{result.best_by_sharpe.total_return_pct ?? 0}%</strong></span>
-                </div>
+
+                <button
+                  onClick={() =>
+                    handleApplyToSimulator(
+                      result.best_by_sharpe.threshold_buy,
+                      result.best_by_sharpe.threshold_sell,
+                      result.best_by_sharpe.alloc_buy_pct
+                    )
+                  }
+                  className="mt-4 w-full flex items-center justify-center gap-1.5 rounded-lg bg-cyan-500/20 border border-cyan-500/40 px-3 py-2 text-xs font-semibold text-cyan-300 hover:bg-cyan-500 hover:text-zinc-950 transition-colors"
+                >
+                  <span>Apply to Simulator</span>
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </button>
               </div>
             )}
 
             {result.best_by_drawdown && (
-              <div className="rounded-xl border border-purple-500/30 bg-purple-950/10 p-5">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-purple-400 flex items-center gap-1.5">
-                    <ShieldCheck className="h-3.5 w-3.5" /> Minimum Drawdown
-                  </span>
-                  <span className="text-xs text-zinc-400">
-                    Alloc: {Math.round((result.best_by_drawdown.alloc_buy_pct ?? 0) * 100)}%
-                  </span>
+              <div className="rounded-xl border border-purple-500/30 bg-purple-950/10 p-5 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-purple-400 flex items-center gap-1.5">
+                      <ShieldCheck className="h-3.5 w-3.5" /> Minimum Drawdown
+                    </span>
+                    <span className="text-xs text-zinc-400">
+                      Alloc: {Math.round((result.best_by_drawdown.alloc_buy_pct ?? 0) * 100)}%
+                    </span>
+                  </div>
+                  <div className="text-2xl font-extrabold text-white">
+                    -{result.best_by_drawdown.max_drawdown_pct ?? 0}%
+                  </div>
+                  <div className="mt-3 flex items-center justify-between text-xs text-zinc-400 border-t border-purple-500/20 pt-2">
+                    <span>Buy ≤ <strong className="text-emerald-400">{result.best_by_drawdown.threshold_buy}</strong></span>
+                    <span>Sell ≥ <strong className="text-cyan-400">{result.best_by_drawdown.threshold_sell}</strong></span>
+                    <span>Sharpe: <strong>{result.best_by_drawdown.sharpe_ratio != null ? result.best_by_drawdown.sharpe_ratio.toFixed(2) : "N/A"}</strong></span>
+                  </div>
                 </div>
-                <div className="text-2xl font-extrabold text-white">
-                  -{result.best_by_drawdown.max_drawdown_pct ?? 0}%
-                </div>
-                <div className="mt-3 flex items-center justify-between text-xs text-zinc-400 border-t border-purple-500/20 pt-2">
-                  <span>Buy ≤ <strong className="text-emerald-400">{result.best_by_drawdown.threshold_buy}</strong></span>
-                  <span>Sell ≥ <strong className="text-cyan-400">{result.best_by_drawdown.threshold_sell}</strong></span>
-                  <span>Sharpe: <strong>{result.best_by_drawdown.sharpe_ratio != null ? result.best_by_drawdown.sharpe_ratio.toFixed(2) : "N/A"}</strong></span>
-                </div>
+
+                <button
+                  onClick={() =>
+                    handleApplyToSimulator(
+                      result.best_by_drawdown.threshold_buy,
+                      result.best_by_drawdown.threshold_sell,
+                      result.best_by_drawdown.alloc_buy_pct
+                    )
+                  }
+                  className="mt-4 w-full flex items-center justify-center gap-1.5 rounded-lg bg-purple-500/20 border border-purple-500/40 px-3 py-2 text-xs font-semibold text-purple-300 hover:bg-purple-500 hover:text-zinc-950 transition-colors"
+                >
+                  <span>Apply to Simulator</span>
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </button>
               </div>
             )}
           </div>
@@ -364,6 +482,7 @@ export default function OptimizerPage() {
                       <th className="pb-2">Sharpe Ratio</th>
                       <th className="pb-2">Win Rate</th>
                       <th className="pb-2">Trades</th>
+                      <th className="pb-2 text-right">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-800/50 text-zinc-300">
@@ -380,6 +499,22 @@ export default function OptimizerPage() {
                         </td>
                         <td className="py-2.5 font-mono">{t.win_rate_pct ?? 0}%</td>
                         <td className="py-2.5 font-mono">{t.trade_count ?? 0}</td>
+                        <td className="py-2.5 text-right">
+                          <button
+                            onClick={() =>
+                              handleApplyToSimulator(
+                                t.threshold_buy,
+                                t.threshold_sell,
+                                t.alloc_buy_pct
+                              )
+                            }
+                            className="inline-flex items-center gap-1 rounded bg-cyan-500/10 border border-cyan-500/30 px-2 py-1 text-[11px] font-semibold text-cyan-300 hover:bg-cyan-500 hover:text-zinc-950 transition-colors"
+                            title={`Simulate Buy ≤ ${t.threshold_buy}, Sell ≥ ${t.threshold_sell}`}
+                          >
+                            <span>Simulate</span>
+                            <ArrowRight className="h-3 w-3" />
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
