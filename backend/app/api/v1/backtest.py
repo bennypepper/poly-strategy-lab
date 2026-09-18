@@ -1,8 +1,11 @@
+import logging
 from fastapi import APIRouter, HTTPException
 from app.models.schemas import BacktestRequest, BacktestResponse
 from app.services.data_fetcher import fetch_market_data
 from app.engine.backtest_numba import run_backtest_full_trace
 from app.indicators.dynamic_channel import classify_asset
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/backtest", tags=["Backtest"])
 
@@ -15,8 +18,11 @@ async def execute_backtest(req: BacktestRequest):
             start_date=req.start_date,
             end_date=req.end_date,
         )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Data fetch error: {str(e)}")
+        logger.exception(f"Failed to fetch market data for {req.symbol}: {e}")
+        raise HTTPException(status_code=400, detail=f"Market data fetch failed for {req.symbol}")
 
     if len(df) < 10:
         raise HTTPException(status_code=400, detail="Insufficient data points for the requested timeframe.")
@@ -32,8 +38,11 @@ async def execute_backtest(req: BacktestRequest):
             fee_rate=req.fee_rate,
             signal_col="signal",
         )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Simulation error: {str(e)}")
+        logger.exception(f"Backtest simulation failed for {req.symbol}: {e}")
+        raise HTTPException(status_code=500, detail="Simulation encountered an internal error")
 
     return BacktestResponse(
         success=True,

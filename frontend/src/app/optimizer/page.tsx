@@ -84,9 +84,12 @@ export default function OptimizerPage() {
   }, []);
 
   const handleAssetSelect = (newSymbol: string) => {
-    setSymbol(newSymbol);
     setShowCustomInput(false);
-    handleRunOptimizer(newSymbol);
+    if (newSymbol === symbol) {
+      handleRunOptimizer(newSymbol);
+    } else {
+      setSymbol(newSymbol);
+    }
   };
 
   const handleCustomTickerSubmit = (e: React.FormEvent) => {

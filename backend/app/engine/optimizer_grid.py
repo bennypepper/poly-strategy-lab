@@ -69,18 +69,17 @@ def run_grid_search(
     best_sharpe = sorted(trials, key=lambda x: x["sharpe_ratio"], reverse=True)[0]
     best_mdd = sorted(trials, key=lambda x: x["max_drawdown_pct"])[0]
 
-    # Generate 2D Heatmap Matrix for default/middle allocation
+    # Generate 2D Heatmap Matrix for default/middle allocation with O(1) lookup
     target_alloc = alloc_pcts[len(alloc_pcts) // 2]
-    matrix = []
-    for tb in buy_thresholds:
-        row = []
-        for ts in sell_thresholds:
-            match = next(
-                (t for t in trials if t["threshold_buy"] == tb and t["threshold_sell"] == ts and abs(t["alloc_buy_pct"] - target_alloc) < 1e-4),
-                None,
-            )
-            row.append(match["sharpe_ratio"] if match else None)
-        matrix.append(row)
+    lookup = {
+        (t["threshold_buy"], t["threshold_sell"]): t["sharpe_ratio"]
+        for t in trials
+        if abs(t["alloc_buy_pct"] - target_alloc) < 1e-4
+    }
+    matrix = [
+        [lookup.get((tb, ts)) for ts in sell_thresholds]
+        for tb in buy_thresholds
+    ]
 
     return {
         "total_trials": len(trials),

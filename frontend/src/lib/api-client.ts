@@ -39,6 +39,7 @@ async function fetchWithTimeout(
   }, timeoutMs);
 
   // Link external abort signal if provided
+  let onAbort: (() => void) | null = null;
   if (options.signal) {
     if (options.signal.aborted) {
       clearTimeout(timer);
@@ -46,10 +47,11 @@ async function fetchWithTimeout(
       abortErr.name = "AbortError";
       throw abortErr;
     }
-    options.signal.addEventListener("abort", () => {
+    onAbort = () => {
       clearTimeout(timer);
       controller.abort();
-    });
+    };
+    options.signal.addEventListener("abort", onAbort, { once: true });
   }
 
   try {
@@ -71,6 +73,9 @@ async function fetchWithTimeout(
     throw new ApiError(`Network error communicating with API at ${url}: ${message}`);
   } finally {
     clearTimeout(timer);
+    if (options.signal && onAbort) {
+      options.signal.removeEventListener("abort", onAbort);
+    }
   }
 }
 

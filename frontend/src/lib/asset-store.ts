@@ -20,6 +20,8 @@ export const DEFAULT_CRYPTO_ASSETS: Asset[] = [
 
 export const CUSTOM_ASSETS_STORAGE_KEY = "poly_custom_assets";
 export const CUSTOM_ASSETS_EVENT = "poly_custom_assets_changed";
+export const TICKER_REGEX = /^[A-Z0-9.\-=]{1,15}$/;
+export const MAX_CUSTOM_ASSETS = 20;
 
 export function getCustomAssets(): Asset[] {
   if (typeof window === "undefined") {
@@ -33,11 +35,12 @@ export function getCustomAssets(): Asset[] {
     if (!Array.isArray(parsed)) return [];
 
     return parsed
-      .filter((item) => item && typeof item.symbol === "string")
+      .filter((item) => item && typeof item.symbol === "string" && TICKER_REGEX.test(item.symbol.toUpperCase()))
+      .slice(0, MAX_CUSTOM_ASSETS)
       .map((item) => ({
         symbol: item.symbol.toUpperCase(),
-        name: typeof item.name === "string" ? item.name : item.symbol.replace("-USD", ""),
-        icon: typeof item.icon === "string" ? item.icon : "◈",
+        name: typeof item.name === "string" ? item.name.slice(0, 30) : item.symbol.replace("-USD", ""),
+        icon: typeof item.icon === "string" ? item.icon.slice(0, 5) : "◈",
         isCustom: true,
       }));
   } catch (err) {
@@ -50,7 +53,7 @@ export function saveCustomAsset(rawSymbol: string): Asset[] {
   if (typeof window === "undefined") return [];
 
   const clean = rawSymbol.trim().toUpperCase();
-  if (!clean) return getCustomAssets();
+  if (!clean || !TICKER_REGEX.test(clean)) return getCustomAssets();
 
   // Check if symbol already exists in default assets
   if (DEFAULT_CRYPTO_ASSETS.some((a) => a.symbol === clean)) {
@@ -59,6 +62,11 @@ export function saveCustomAsset(rawSymbol: string): Asset[] {
 
   const existing = getCustomAssets();
   if (existing.some((a) => a.symbol === clean)) {
+    return existing;
+  }
+
+  if (existing.length >= MAX_CUSTOM_ASSETS) {
+    console.warn(`Maximum custom asset limit of ${MAX_CUSTOM_ASSETS} reached.`);
     return existing;
   }
 

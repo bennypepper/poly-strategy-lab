@@ -146,9 +146,12 @@ function SimulatorContent() {
   );
 
   const handleAssetSelect = (newSymbol: string) => {
-    setSymbol(newSymbol);
     setShowCustomInput(false);
-    handleRunSimulation(newSymbol);
+    if (newSymbol === symbol) {
+      handleRunSimulation(newSymbol);
+    } else {
+      setSymbol(newSymbol);
+    }
   };
 
   const handleShareLink = async () => {

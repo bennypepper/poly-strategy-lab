@@ -1,24 +1,34 @@
+import asyncio
+import logging
 from fastapi import APIRouter, HTTPException
 from app.models.schemas import OptimizeRequest, OptimizeResponse
 from app.services.data_fetcher import fetch_market_data
 from app.engine.optimizer_grid import run_grid_search
 from app.indicators.dynamic_channel import classify_asset
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/optimize", tags=["Optimizer"])
 
 @router.post("", response_model=OptimizeResponse)
 async def optimize_parameters(req: OptimizeRequest):
-    """Run parameter grid search across specified threshold & allocation intervals."""
+    """Run parameter grid search asynchronously in a worker thread across specified thresholds."""
     try:
-        df = fetch_market_data(symbol=req.symbol)
+        df = await asyncio.to_thread(fetch_market_data, symbol=req.symbol)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to fetch market data: {str(e)}")
+        logger.exception(f"Failed to fetch market data for {req.symbol}: {e}")
+        raise HTTPException(status_code=400, detail=f"Market data fetch failed for {req.symbol}")
 
     if len(df) < 10:
         raise HTTPException(status_code=400, detail="Insufficient data to perform parameter optimization.")
 
     try:
-        res = run_grid_search(
+        # Offload synchronous CPU-intensive grid search to a worker thread
+        # to prevent blocking the FastAPI asyncio event loop (CWE-400)
+        res = await asyncio.to_thread(
+            run_grid_search,
             df=df,
             buy_thresholds=req.buy_thresholds,
             sell_thresholds=req.sell_thresholds,
@@ -28,9 +38,10 @@ async def optimize_parameters(req: OptimizeRequest):
             signal_col="signal",
         )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=f"Invalid parameter configuration: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Grid search error: {str(e)}")
+        logger.exception(f"Grid search calculation failed for {req.symbol}: {e}")
+        raise HTTPException(status_code=500, detail="Parameter optimization calculation encountered an internal error")
 
     return OptimizeResponse(
         success=True,

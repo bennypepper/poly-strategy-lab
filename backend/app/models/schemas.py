@@ -1,6 +1,15 @@
 from __future__ import annotations
+import re
 from typing import List, Optional
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, model_validator, field_validator
+
+TICKER_REGEX = re.compile(r"^[A-Z0-9.\-=]{1,20}$")
+
+def validate_ticker_symbol(v: str) -> str:
+    clean = v.strip().upper()
+    if not TICKER_REGEX.match(clean):
+        raise ValueError(f"Invalid symbol format '{clean}'. Must match pattern {TICKER_REGEX.pattern}")
+    return clean
 
 class AssetInfo(BaseModel):
     symbol: str = Field(..., description="Ticker symbol, e.g. BTC-USD, ETH-USD")
@@ -9,6 +18,21 @@ class AssetInfo(BaseModel):
     base_currency: str = Field(default="USD")
     first_available_date: str
     is_active: bool = True
+
+    @field_validator("symbol")
+    @classmethod
+    def check_symbol(cls, v: str) -> str:
+        return validate_ticker_symbol(v)
+
+class BacktestParams(BaseModel):
+    symbol: str
+    threshold_buy: int
+    threshold_sell: int
+    alloc_buy_pct: float
+    initial_capital: float = 10_000.0
+    fee_rate: float = 0.001
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
 
 class BacktestRequest(BaseModel):
     symbol: str = Field(default="BTC-USD", description="Asset symbol to simulate")
@@ -19,6 +43,11 @@ class BacktestRequest(BaseModel):
     fee_rate: float = Field(default=0.001, ge=0.0, le=0.05, description="Trading commission rate")
     start_date: Optional[str] = Field(default=None, description="Start date YYYY-MM-DD")
     end_date: Optional[str] = Field(default=None, description="End date YYYY-MM-DD")
+
+    @field_validator("symbol")
+    @classmethod
+    def check_symbol(cls, v: str) -> str:
+        return validate_ticker_symbol(v)
 
     @model_validator(mode="after")
     def validate_thresholds(self) -> BacktestRequest:
@@ -68,7 +97,7 @@ class BacktestResponse(BaseModel):
     success: bool
     symbol: str
     asset_type: str = "crypto"
-    params: dict
+    params: BacktestParams
     metrics: StrategyMetrics
     benchmark: BenchmarkMetrics
     equity_curve: List[EquityPoint]
@@ -89,13 +118,37 @@ class MarketDataResponse(BaseModel):
     count: int
     data: List[MarketDataPoint]
 
+class OptimizeTrial(BaseModel):
+    threshold_buy: int
+    threshold_sell: int
+    alloc_buy_pct: float
+    total_return_pct: float
+    max_drawdown_pct: float
+    sharpe_ratio: float
+    win_rate_pct: float
+    trade_count: int
+
 class OptimizeRequest(BaseModel):
     symbol: str = Field(default="BTC-USD")
-    buy_thresholds: List[int] = Field(default=[15, 20, 25, 30, 35, 40])
-    sell_thresholds: List[int] = Field(default=[60, 65, 70, 75, 80, 85])
-    alloc_pcts: List[float] = Field(default=[0.4, 0.6, 0.8, 1.0])
-    initial_capital: float = Field(default=100_000.0)
-    fee_rate: float = Field(default=0.001)
+    buy_thresholds: List[int] = Field(default=[15, 20, 25, 30, 35, 40], min_length=1, max_length=15)
+    sell_thresholds: List[int] = Field(default=[60, 65, 70, 75, 80, 85], min_length=1, max_length=15)
+    alloc_pcts: List[float] = Field(default=[0.4, 0.6, 0.8, 1.0], min_length=1, max_length=10)
+    initial_capital: float = Field(default=100_000.0, gt=0.0)
+    fee_rate: float = Field(default=0.001, ge=0.0, le=0.05)
+
+    @field_validator("symbol")
+    @classmethod
+    def check_symbol(cls, v: str) -> str:
+        return validate_ticker_symbol(v)
+
+    @model_validator(mode="after")
+    def validate_combination_limits(self) -> OptimizeRequest:
+        combos = len(self.buy_thresholds) * len(self.sell_thresholds) * len(self.alloc_pcts)
+        if combos > 500:
+            raise ValueError(
+                f"Total parameter combinations ({combos}) exceeds the maximum allowable cap of 500."
+            )
+        return self
 
 class OptimizeResponse(BaseModel):
     success: bool
@@ -106,7 +159,7 @@ class OptimizeResponse(BaseModel):
     buy_thresholds: List[int]
     sell_thresholds: List[int]
     heatmap_matrix: List[List[Optional[float]]]
-    best_by_return: dict
-    best_by_sharpe: dict
-    best_by_drawdown: dict
-    top_trials: List[dict]
+    best_by_return: OptimizeTrial
+    best_by_sharpe: OptimizeTrial
+    best_by_drawdown: OptimizeTrial
+    top_trials: List[OptimizeTrial]

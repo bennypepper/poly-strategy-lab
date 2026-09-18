@@ -181,7 +181,7 @@ def run_backtest_full_trace(
                     "shares": float(units_bought),
                     "cost": float(trade_amount),
                     "cash_after": float(cash),
-                    "port_value": float(cash + (holdings * p_close)),
+                    "port_value": float(cash + (holdings * p_exec)),
                     "pnl": 0.0,
                 })
 
@@ -211,7 +211,7 @@ def run_backtest_full_trace(
                     "shares": float(units_sold),
                     "cost": float(gross_usd),
                     "cash_after": float(cash),
-                    "port_value": float(cash + (holdings * p_close)),
+                    "port_value": float(cash + (holdings * p_exec)),
                     "pnl": round(float(trade_pnl), 2),
                 })
 

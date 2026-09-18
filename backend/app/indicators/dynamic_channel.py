@@ -110,7 +110,8 @@ def compute_btc_trolololo(btc_close: pd.Series, algo_window: int = 365) -> pd.Se
 def compute_generic_channel(close_series: pd.Series, window: int = 180) -> pd.Series:
     """
     Generalized logarithmic regression channel for non-BTC assets (ETH, SOL, etc.).
-    Fits an adaptive power-law channel based on logarithmic trend and quantile envelopes.
+    Fits a causal walk-forward power-law channel based on rolling logarithmic trend and quantile envelopes.
+    Strictly eliminates lookahead bias: each bar t evaluates using ONLY observations <= t.
     """
     if not isinstance(close_series.index, pd.DatetimeIndex):
         raise TypeError("close_series must have a DatetimeIndex.")
@@ -124,29 +125,34 @@ def compute_generic_channel(close_series: pd.Series, window: int = 180) -> pd.Se
         return pd.Series(np.full(n, 50.0), index=dates, name="signal")
 
     t = np.arange(n, dtype=float)
-    t_valid = t[valid]
-    log_p = np.log(prices[valid])
+    trend_all = np.full(n, np.nan)
 
-    # Fit central log-linear trend: ln(P) = a * ln(t + 30) + b
-    log_t = np.log(t_valid + 30.0)
-    slope, intercept, _, _, _ = stats.linregress(log_t, log_p)
-    trend_all = slope * np.log(t + 30.0) + intercept
+    # Causal rolling regression: bar i only uses historical data <= i
+    for i in range(30, n):
+        w_start = max(0, i - window + 1)
+        sub_t = t[w_start : i + 1]
+        sub_p = np.log(prices[w_start : i + 1])
+        valid_sub = np.isfinite(sub_p)
+        if valid_sub.sum() >= 15:
+            sl, ic, _, _, _ = stats.linregress(np.log(sub_t[valid_sub] + 30.0), sub_p[valid_sub])
+            trend_all[i] = sl * np.log(t[i] + 30.0) + ic
 
     residuals = np.full(n, np.nan)
-    residuals[valid] = np.log(prices[valid]) - trend_all[valid]
+    valid_trend = np.isfinite(trend_all) & valid
+    residuals[valid_trend] = np.log(prices[valid_trend]) - trend_all[valid_trend]
 
-    # Compute rolling quantile bands for upper/lower channel envelopes
+    # Compute rolling quantile bands strictly causally (NO bfill - CWE-Lookahead remediation)
     res_series = pd.Series(residuals, index=dates)
-    res_filled = res_series.ffill().bfill()
-    roll_top = res_filled.rolling(window=window, min_periods=30).quantile(0.95).bfill().ffill().values
-    roll_bottom = res_filled.rolling(window=window, min_periods=30).quantile(0.05).bfill().ffill().values
+    res_filled = res_series.ffill().fillna(0.0)
+    roll_top = res_filled.rolling(window=window, min_periods=30).quantile(0.95).ffill().fillna(0.1).values
+    roll_bottom = res_filled.rolling(window=window, min_periods=30).quantile(0.05).ffill().fillna(-0.1).values
 
     channel_top = trend_all + roll_top
     channel_bottom = trend_all + roll_bottom
     channel_range = channel_top - channel_bottom
     safe_range = np.where(channel_range > 1e-6, channel_range, 1.0)
 
-    raw = np.where(valid & (channel_range > 1e-6), (np.log(prices) - channel_bottom) / safe_range, np.nan)
+    raw = np.where(valid_trend & (channel_range > 1e-6), (np.log(prices) - channel_bottom) / safe_range, np.nan)
     return pd.Series(np.where(np.isfinite(raw), np.clip(raw, 0.0, 1.0) * 100.0, 50.0), index=dates, name="signal")
 
 
@@ -247,8 +253,9 @@ def compute_equity_channel(
     valid_hat = np.isfinite(hat_y)
     eps[valid_hat] = log_p[valid_hat] - hat_y[valid_hat]
 
+    # Causal volatility calculation without backward fill (NO bfill)
     eps_series = pd.Series(eps, index=dates)
-    roll_std = eps_series.rolling(window=vol_window, min_periods=20).std().bfill().ffill().values
+    roll_std = eps_series.rolling(window=vol_window, min_periods=20).std().ffill().fillna(0.05).values
     safe_std = np.where((roll_std > 1e-4) & np.isfinite(roll_std), roll_std, 0.05)
 
     z = np.where(valid_hat, eps / safe_std, 0.0)
