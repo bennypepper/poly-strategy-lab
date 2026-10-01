@@ -37,3 +37,16 @@ def test_router_selection():
     sig_eth = compute_normalized_signal("ETH-USD", s)
     assert len(sig_eth) == 100
     assert (sig_eth >= 0.0).all() and (sig_eth <= 100.0).all()
+
+def test_btc_indicator_strict_causality():
+    dates = pd.date_range("2015-01-01", periods=1000, freq="D")
+    prices = 300.0 * np.exp(np.linspace(0, 3.0, 1000)) + np.random.normal(0, 10, 1000)
+    prices = np.maximum(prices, 1.0)
+    s = pd.Series(prices, index=dates)
+
+    T = 800
+    s_slice = s.iloc[:T]
+    sig_slice = compute_btc_trolololo(s_slice)
+    sig_full = compute_btc_trolololo(s)
+
+    assert np.isclose(sig_slice.iloc[-1], sig_full.iloc[T-1])
