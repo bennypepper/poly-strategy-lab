@@ -287,7 +287,7 @@ export default function OptimizerPage() {
                   <div className="flex items-center gap-2">
                     <span className="font-semibold text-white">Quantitative Engine:</span>
                     <span className="rounded-full bg-blue-500/20 border border-blue-500/30 px-2 py-0.5 text-[11px] font-medium text-blue-300">
-                      Equity Compounding Model
+                      Equity Compounding Channel
                     </span>
                   </div>
                   <p className="mt-0.5 text-[11px] text-zinc-400">
@@ -306,11 +306,11 @@ export default function OptimizerPage() {
                   <div className="flex items-center gap-2">
                     <span className="font-semibold text-white">Quantitative Engine:</span>
                     <span className="rounded-full bg-emerald-500/20 border border-emerald-500/30 px-2 py-0.5 text-[11px] font-medium text-emerald-300">
-                      Crypto Power-Law Model
+                      {symbol.startsWith('BTC') ? "Bitcoin Power-Law (CRPL)" : "Altcoin Adaptive Residual Channel (DARC)"}
                     </span>
                   </div>
                   <p className="mt-0.5 text-[11px] text-zinc-400">
-                    Scale-invariant logarithmic adoption trajectory with dynamic quantile band normalization calibrated for cryptocurrency halving cycles.
+                    {symbol.startsWith('BTC') ? "Scale-invariant logarithmic adoption trajectory with dynamic quantile band normalization calibrated for cryptocurrency halving cycles." : "Dynamic Adaptive Residual Channel with robust rolling MAD dispersion and continuous Tanh-MAD normalization."}
                   </p>
                 </div>
               </div>

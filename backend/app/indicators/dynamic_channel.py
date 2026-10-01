@@ -63,11 +63,11 @@ def compute_btc_trolololo(btc_close: pd.Series, algo_window: int = 365) -> pd.Se
     return pd.Series(signal.values, index=dates, name="signal")
 
 
-def compute_generic_channel(close_series: pd.Series, window: int = 180) -> pd.Series:
+def compute_generic_channel(close_series: pd.Series) -> pd.Series:
     """
-    Generalized logarithmic regression channel for non-BTC assets (ETH, SOL, etc.).
-    Fits a causal walk-forward power-law channel based on rolling logarithmic trend and quantile envelopes.
-    Strictly eliminates lookahead bias: each bar t evaluates using ONLY observations <= t.
+    Dynamic Adaptive Residual Channel (DARC) for Altcoins.
+    Causal walk-forward adaptive baseline using log-returns and robust dispersion.
+    Strictly bounded [0, 100] with smooth gradients.
     """
     if not isinstance(close_series.index, pd.DatetimeIndex):
         raise TypeError("close_series must have a DatetimeIndex.")
@@ -77,39 +77,36 @@ def compute_generic_channel(close_series: pd.Series, window: int = 180) -> pd.Se
     prices = close_series.values.astype(float)
 
     valid = (prices > 0) & np.isfinite(prices)
-    if valid.sum() < 30:
+    if valid.sum() < 60:
         return pd.Series(np.full(n, 50.0), index=dates, name="signal")
 
-    t = np.arange(n, dtype=float)
-    trend_all = np.full(n, np.nan)
-
-    # Causal rolling regression: bar i only uses historical data <= i
-    for i in range(30, n):
-        w_start = max(0, i - window + 1)
-        sub_t = t[w_start : i + 1]
-        sub_p = np.log(prices[w_start : i + 1])
-        valid_sub = np.isfinite(sub_p)
-        if valid_sub.sum() >= 15:
-            sl, ic, _, _, _ = stats.linregress(np.log(sub_t[valid_sub] + 30.0), sub_p[valid_sub])
-            trend_all[i] = sl * np.log(t[i] + 30.0) + ic
-
-    residuals = np.full(n, np.nan)
-    valid_trend = np.isfinite(trend_all) & valid
-    residuals[valid_trend] = np.log(prices[valid_trend]) - trend_all[valid_trend]
-
-    # Compute rolling quantile bands strictly causally (NO bfill - CWE-Lookahead remediation)
-    res_series = pd.Series(residuals, index=dates)
-    res_filled = res_series.ffill().fillna(0.0)
-    roll_top = res_filled.rolling(window=window, min_periods=30).quantile(0.95).ffill().fillna(0.1).values
-    roll_bottom = res_filled.rolling(window=window, min_periods=30).quantile(0.05).ffill().fillna(-0.1).values
-
-    channel_top = trend_all + roll_top
-    channel_bottom = trend_all + roll_bottom
-    channel_range = channel_top - channel_bottom
-    safe_range = np.where(channel_range > 1e-6, channel_range, 1.0)
-
-    raw = np.where(valid_trend & (channel_range > 1e-6), (np.log(prices) - channel_bottom) / safe_range, np.nan)
-    return pd.Series(np.where(np.isfinite(raw), np.clip(raw, 0.0, 1.0) * 100.0, 50.0), index=dates, name="signal")
+    log_p = np.full(n, np.nan)
+    log_p[valid] = np.log(prices[valid])
+    
+    # Causal adaptive central baseline (EMA of log-prices)
+    s_log = pd.Series(log_p, index=dates)
+    mu_bar = s_log.ewm(span=21, adjust=False).mean()
+    
+    # Causal log-deviation
+    eps = s_log - mu_bar
+    
+    # Rolling robust dispersion over W=60 days
+    med = eps.rolling(window=60, min_periods=20).median()
+    mad = (eps - med).abs().rolling(window=60, min_periods=20).median()
+    
+    # Robust volatility
+    sigma_mad = 1.4826 * mad.clip(lower=0.02)
+    
+    # Robust standardized score
+    Z = (eps - med) / sigma_mad
+    
+    # Continuous Tanh-MAD normalization
+    signal = 50.0 * (1.0 + np.tanh(Z / 2.5))
+    
+    # Clip and fill warmup
+    signal = signal.clip(0.0, 100.0).fillna(50.0)
+    
+    return pd.Series(signal.values, index=dates, name="signal")
 
 
 def classify_asset(symbol: str) -> str:
@@ -221,24 +218,23 @@ def compute_equity_channel(
 
     # Stage 5: Gated Signal Synthesis
     signal = np.full(n, 50.0)
+    
+    # Calculate trend divergence
+    ema_200_safe = np.where(ema_200 > 1e-6, ema_200, 1.0)
+    D = (ema_50 - ema_200) / ema_200_safe
+    
+    # Smooth regime weight
+    w_bull = 1.0 / (1.0 + np.exp(-40.0 * D))
+    
     for i in range(1, n):
         if not valid_hat[i]:
             signal[i] = 50.0
-        elif regime[i] == 0:
-            # Secular Bear: force defensive liquidation / prohibit buys
-            signal[i] = 95.0
-        elif regime[i] == 1 and regime[i - 1] == 0:
-            # Bull Initiation: trigger long entry
-            signal[i] = 10.0
-        elif omega[i] <= 30.0:
-            # Bull Pullback: accumulate value
-            signal[i] = max(5.0, float(omega[i]))
-        elif omega[i] >= 95.0:
-            # Parabolic extension in bull market: tactical trim
-            signal[i] = 95.0
-        else:
-            # Normal Bull Trend Compounding: Hold position
+        elif i < 200:
             signal[i] = 50.0
+        else:
+            signal[i] = w_bull[i] * float(omega[i]) + (1.0 - w_bull[i]) * 92.0
+            
+    signal = np.clip(signal, 0.0, 100.0)
 
     return pd.Series(signal, index=dates, name="signal")
 
