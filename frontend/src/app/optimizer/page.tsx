@@ -342,6 +342,55 @@ export default function OptimizerPage() {
             )}
           </div>
 
+          {/* Walk-Forward Validation */}
+          {result.walk_forward && (
+            <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-6 flex flex-col gap-4 shadow-sm">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold tracking-tight text-white flex items-center gap-2">
+                    <ShieldCheck className="h-4 w-4 text-cyan-400" /> Walk-Forward Validation
+                  </h3>
+                  <p className="text-xs text-zinc-400 mt-1">
+                    Out-of-sample robustness testing across temporal split to prevent data snooping.
+                  </p>
+                </div>
+                <div
+                  className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+                    result.walk_forward.status === "Robust"
+                      ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
+                      : result.walk_forward.status === "Moderate"
+                      ? "border-amber-500/30 bg-amber-500/10 text-amber-400"
+                      : "border-red-500/30 bg-red-500/10 text-red-400"
+                  }`}
+                >
+                  {result.walk_forward.status}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="rounded-lg bg-zinc-950/50 p-3 border border-zinc-800/50">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">In-Sample Sharpe</span>
+                  <div className="mt-1 text-lg font-bold text-zinc-300">{result.walk_forward.in_sample_sharpe.toFixed(2)}</div>
+                  <div className="text-[10px] text-zinc-500 mt-0.5">{result.walk_forward.in_sample_period}</div>
+                </div>
+                <div className="rounded-lg bg-zinc-950/50 p-3 border border-zinc-800/50">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">OOS Sharpe</span>
+                  <div className="mt-1 text-lg font-bold text-white">{result.walk_forward.out_of_sample_sharpe.toFixed(2)}</div>
+                  <div className="text-[10px] text-zinc-500 mt-0.5">{result.walk_forward.out_of_sample_period}</div>
+                </div>
+                <div className="rounded-lg bg-zinc-950/50 p-3 border border-zinc-800/50">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">OOS Return / MDD</span>
+                  <div className="mt-1 text-lg font-bold text-emerald-400">+{result.walk_forward.out_of_sample_return_pct.toFixed(2)}%</div>
+                  <div className="text-[10px] text-red-400 mt-0.5">-{result.walk_forward.out_of_sample_mdd_pct.toFixed(2)}% Max DD</div>
+                </div>
+                <div className="rounded-lg bg-zinc-950/50 p-3 border border-zinc-800/50">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">Gen. Efficiency</span>
+                  <div className="mt-1 text-lg font-bold text-cyan-400">{Math.round(result.walk_forward.efficiency_ratio * 100)}%</div>
+                  <div className="text-[10px] text-zinc-500 mt-0.5">OOS vs IS Ratio</div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Optimal Configurations Overview */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             {result.best_by_return && (

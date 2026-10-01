@@ -58,4 +58,5 @@ async def optimize_parameters(req: OptimizeRequest):
         best_by_sharpe=res["best_by_sharpe"],
         best_by_drawdown=res["best_by_drawdown"],
         top_trials=res["top_trials"],
+        walk_forward=res.get("walk_forward"),
     )

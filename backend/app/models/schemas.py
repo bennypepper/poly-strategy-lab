@@ -150,6 +150,17 @@ class OptimizeRequest(BaseModel):
             )
         return self
 
+class WalkForwardValidation(BaseModel):
+    in_sample_period: str
+    out_of_sample_period: str
+    in_sample_sharpe: float
+    out_of_sample_sharpe: float
+    in_sample_return_pct: float
+    out_of_sample_return_pct: float
+    out_of_sample_mdd_pct: float
+    efficiency_ratio: float
+    status: str
+
 class OptimizeResponse(BaseModel):
     success: bool
     symbol: str
@@ -163,3 +174,4 @@ class OptimizeResponse(BaseModel):
     best_by_sharpe: OptimizeTrial
     best_by_drawdown: OptimizeTrial
     top_trials: List[OptimizeTrial]
+    walk_forward: Optional[WalkForwardValidation] = None

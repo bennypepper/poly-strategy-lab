@@ -118,6 +118,18 @@ export interface OptimizeTrial {
   trade_count: number;
 }
 
+export interface WalkForwardValidation {
+  in_sample_period: string;
+  out_of_sample_period: string;
+  in_sample_sharpe: number;
+  out_of_sample_sharpe: number;
+  in_sample_return_pct: number;
+  out_of_sample_return_pct: number;
+  out_of_sample_mdd_pct: number;
+  efficiency_ratio: number;
+  status: string;
+}
+
 export interface OptimizeResponse {
   success: boolean;
   symbol: string;
@@ -131,4 +143,5 @@ export interface OptimizeResponse {
   best_by_sharpe: OptimizeTrial;
   best_by_drawdown: OptimizeTrial;
   top_trials: OptimizeTrial[];
+  walk_forward?: WalkForwardValidation;
 }

@@ -26,3 +26,8 @@ def test_grid_search_execution():
     assert "best_by_drawdown" in res
     assert "heatmap_matrix" in res
     assert len(res["heatmap_matrix"]) == 2
+    assert "walk_forward" in res
+    assert res["walk_forward"] is not None
+    assert "in_sample_period" in res["walk_forward"]
+    assert "out_of_sample_period" in res["walk_forward"]
+    assert "status" in res["walk_forward"]
