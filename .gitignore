@@ -60,5 +60,7 @@ Thumbs.db
 
 # Local runtime caches & temporary data
 *.log
+data/
+cache/
 backend/data/cache/
 backend/.cache/
