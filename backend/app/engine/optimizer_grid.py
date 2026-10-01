@@ -14,6 +14,7 @@ def run_grid_search(
     initial_cash: float = 100_000.0,
     fee_rate: float = 0.001,
     signal_col: str = "signal",
+    annualization_factor: float = 365.0,
 ) -> Dict[str, Any]:
     """
     Exhaustive grid search across threshold and allocation combinations using Numba.
@@ -46,6 +47,7 @@ def run_grid_search(
                     alloc_sell_pct=1.0,
                     initial_cash=initial_cash,
                     fee_rate=fee_rate,
+                    annualization_factor=annualization_factor,
                 )
 
                 win_rate = (wins / sells * 100.0) if sells > 0 else 0.0

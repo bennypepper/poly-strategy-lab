@@ -17,6 +17,7 @@ def run_backtest_numba(
     alloc_sell_pct: float = 1.0,
     initial_cash: float = 100_000.0,
     fee_rate: float = 0.001,
+    annualization_factor: float = 365.0,
 ) -> Tuple[float, float, float, int, int, int]:
     """
     Numba JIT-compiled backtest loop for arbitrary assets.
@@ -94,10 +95,10 @@ def run_backtest_numba(
     returns_slice = daily_returns[1:] if n_days > 1 else daily_returns
     mean_ret = np.mean(returns_slice)
     std_ret = np.std(returns_slice)
-    rf_daily = 0.04 / 365.0
+    rf_daily = 0.04 / annualization_factor
     sharpe_ratio = 0.0
     if std_ret > 0:
-        sharpe_ratio = ((mean_ret - rf_daily) / std_ret) * np.sqrt(365.0)
+        sharpe_ratio = ((mean_ret - rf_daily) / std_ret) * np.sqrt(annualization_factor)
 
     return total_return, max_drawdown, sharpe_ratio, wins, sell_count, trade_count
 
@@ -111,6 +112,7 @@ def run_backtest_full_trace(
     initial_cash: float = 100_000.0,
     fee_rate: float = 0.001,
     signal_col: str = "signal",
+    annualization_factor: float = 365.0,
 ) -> Dict[str, Any]:
     """Full trace simulation returning equity curve and execution logs."""
     if not isinstance(df.index, pd.DatetimeIndex):
@@ -238,8 +240,8 @@ def run_backtest_full_trace(
             bh_mdd = dd
 
     bh_std = float(np.std(bh_daily_ret))
-    rf_daily = 0.04 / 365.0
-    bh_sharpe = float(((np.mean(bh_daily_ret) - rf_daily) / bh_std) * np.sqrt(365.0)) if bh_std > 1e-8 else 0.0
+    rf_daily = 0.04 / annualization_factor
+    bh_sharpe = float(((np.mean(bh_daily_ret) - rf_daily) / bh_std) * np.sqrt(annualization_factor)) if bh_std > 1e-8 else 0.0
 
     # Strategy Metrics
     total_return = float((pv[-1] - initial_cash) / initial_cash)
@@ -258,14 +260,14 @@ def run_backtest_full_trace(
 
     sharpe = 0.0
     if std_ret > 1e-8:
-        sharpe = float(((mean_ret - rf_daily) / std_ret) * np.sqrt(365.0))
+        sharpe = float(((mean_ret - rf_daily) / std_ret) * np.sqrt(annualization_factor))
 
     # Sortino ratio (downside deviation)
     negative_returns = returns_slice[returns_slice < 0]
     downside_std = float(np.std(negative_returns)) if len(negative_returns) > 0 else 0.0
     sortino = 0.0
     if downside_std > 1e-8:
-        sortino = float(((mean_ret - rf_daily) / downside_std) * np.sqrt(365.0))
+        sortino = float(((mean_ret - rf_daily) / downside_std) * np.sqrt(annualization_factor))
 
     # CAGR
     years = max((dates[-1] - dates[0]).days / 365.25, 0.1)

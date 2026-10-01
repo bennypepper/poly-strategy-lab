@@ -27,6 +27,7 @@ async def optimize_parameters(req: OptimizeRequest):
     try:
         # Offload synchronous CPU-intensive grid search to a worker thread
         # to prevent blocking the FastAPI asyncio event loop (CWE-400)
+        annualization_factor = 252.0 if classify_asset(req.symbol) == "equity" else 365.0
         res = await asyncio.to_thread(
             run_grid_search,
             df=df,
@@ -36,6 +37,7 @@ async def optimize_parameters(req: OptimizeRequest):
             initial_cash=req.initial_capital,
             fee_rate=req.fee_rate,
             signal_col="signal",
+            annualization_factor=annualization_factor,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

@@ -28,6 +28,7 @@ async def execute_backtest(req: BacktestRequest):
         raise HTTPException(status_code=400, detail="Insufficient data points for the requested timeframe.")
 
     try:
+        annualization_factor = 252.0 if classify_asset(req.symbol) == "equity" else 365.0
         result = run_backtest_full_trace(
             df=df,
             threshold_buy=req.threshold_buy,
@@ -37,6 +38,7 @@ async def execute_backtest(req: BacktestRequest):
             initial_cash=req.initial_capital,
             fee_rate=req.fee_rate,
             signal_col="signal",
+            annualization_factor=annualization_factor,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
